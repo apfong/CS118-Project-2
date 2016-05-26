@@ -1,13 +1,54 @@
-Report
 
-/*************
-***Problems***
-**************/
+------------------------------------------------------------------------------
+|                            High level design                               |
+------------------------------------------------------------------------------
+Client:
+
+Server:
+
+HTTP Message:
+
+Overall:
+
+------------------------------------------------------------------------------
+|                Problems you ran into and how you solved them               |
+------------------------------------------------------------------------------
+Client:
+
+Server:
+
+HTTP Message:
+
+Overall:
 
 
+------------------------------------------------------------------------------
+|                Additional instructions to build your project               |
+------------------------------------------------------------------------------
+None
 
-/*************
-***Questions**
-**************/
 
-What port for the server?
+------------------------------------------------------------------------------
+|                       How you tested your code and why                     |
+------------------------------------------------------------------------------
+Client:
+
+Server:
+
+HTTP Message:
+
+Overall:
+
+
+------------------------------------------------------------------------------
+|                 Contribution of each team member and their UID             |
+------------------------------------------------------------------------------
+Brandon: Client UID
+Max: HTTPMessage UID
+Alex: Server UID
+
+Questions:
+  What headers do we need to support for responses?
+  What are we supposed to do with the hostname argument for the server?
+  For status header in response, do we need to keep track of code and phrase
+     separately, or is it sufficient to just have a string for both?

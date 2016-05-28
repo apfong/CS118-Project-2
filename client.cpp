@@ -53,7 +53,8 @@ int main(int argc, char* argv[])
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(4000);//request.getPort();
 	//serverAddr.sin_port = htons(80);     // short, network byte order
-	serverAddr.sin_addr.s_addr = inet_addr(ipstr);
+	//serverAddr.sin_addr.s_addr = inet_addr(ipstr);
+	serverAddr.sin_addr.s_addr = inet_addr("10.0.0.1");
 	memset(serverAddr.sin_zero, '\0', sizeof(serverAddr.sin_zero));
 
 	while(true){

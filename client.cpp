@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
 	  hints.ai_socktype = SOCK_STREAM; // TCP
 	  // gets a list of addresses stored in res
 	  int status = 0;
-	  string hoststring = "localhost";
+	  string hoststring = "10.0.0.1";
 	  const char * host = hoststring.c_str();
 	  string portstring = "4000";
 	  const char * port = portstring.c_str();

@@ -56,7 +56,7 @@ int main()
 	//   perror("listen");
 	//   return 3;
 	// }
-	const int buf_size = 1024;
+	const int buf_size = 1032;
 	char * buf = new char[buf_size];
 	memset(buf,'\0',sizeof(buf));
 	cout<<"start recv"<<endl;

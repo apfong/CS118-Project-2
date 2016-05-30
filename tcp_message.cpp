@@ -22,6 +22,8 @@ public:
     bool getAckFlag();
     bool getSynFlag();
     bool getFinFlag();
+
+    string getData();
     
     vector<char> buildPacket();
     
@@ -33,6 +35,7 @@ private:
     uint16_t window;
     uint16_t flags; //xxxxxxxxxxxxxASF
     vector<char> data;
+    bool retransmit;
 };
 
 TcpPacket::TcpPacket(uint16_t s, uint16_t a, uint16_t w, uint16_t f, vector<char> d) {
@@ -41,6 +44,7 @@ TcpPacket::TcpPacket(uint16_t s, uint16_t a, uint16_t w, uint16_t f, vector<char
     window = w;
     flags = f;
     data = d;
+    retransmit = true;
 }
 
 TcpPacket::TcpPacket(vector<char> vec) {
@@ -54,7 +58,13 @@ TcpPacket::TcpPacket(vector<char> vec) {
     for (it = (vec.begin()+8); it != vec.end(); it++) {
         data.push_back(*it);
     }
+    retransmit = true;
     
+}
+
+string TcpPacket::getData(){
+    string s(data.begin(),data.end());
+    return s;
 }
 
 uint16_t TcpPacket::getSeqNum() {
@@ -122,6 +132,17 @@ void TcpPacket::testPrint() {
     }
     cout << endl;
 }
+
+// void TcpPacket::startTimer(){
+//     thread(timeout).detach();
+// }
+
+// void TcpPacket::timeout(){
+//     this_thread::sleep_for(chrono::milliseconds(500));
+//     if(retransmit)
+//     cerr<<"asynch timeout"<<endl;
+//     exit(1);
+// }
 
 
 

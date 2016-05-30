@@ -69,8 +69,8 @@ int main()
 	int CURRENT_SEQ_NUM = 0;//rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
 	int CURRENT_ACK_NUM = 0;
 
-	bool placeholder = true;
-	while(placeholder){
+	while(true){
+		bytesRec = 0;
 		bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 		if(bytesRec == -1){
 			perror("error receiving");
@@ -120,7 +120,6 @@ int main()
 					cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
 					CURRENT_ACK_NUM = header->getSeqNum() + 1;
 					cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
-					placeholder = false;
 				}
 
 				delete header;
@@ -268,6 +267,10 @@ int main()
 				}
 			}
 			resFile.close();
+			startedHandshake = false;
+			establishedTCP = false;
+			CURRENT_SEQ_NUM = 0;
+			CURRENT_ACK_NUM = 0;
 		}
 
 	}

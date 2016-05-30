@@ -71,7 +71,7 @@ int main()
 
   	bool placeholder = true;
   	while(placeholder){
-  		placeholder = false;
+  		//placeholder = false;
 	  	bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 	  	if(bytesRec == -1){
 	  		perror("error receiving");
@@ -106,71 +106,62 @@ int main()
 			  	if (header->getAckNum() == seqNumRes + 1) {
 			  		cerr << "Established TCP connection after 3 way handshake\n";
 			  		establishedTCP = true;
+			  		break;
 			  	}
 
 			 	delete header;
 			  	//continue;
 			}
-
-	        // Preparing to open file
-	      	//stringstream filestream;
-	      	//string line;
-
-	      	string resFilename = "index.html";
-	      	//streampos size;
-
-		  	// Dealing with root file request
-	      	if (resFilename == "/") {
-	      		resFilename += "index.html";
-	      	}
-
-		  	// Prepending starting directory to requested filename
-	      	//resFilename.insert(0, tFiledir);
-
-	      	cerr << "trying to get file from path: " << resFilename << endl;
-	      	ifstream resFile (resFilename, ios::in|ios::binary);
-
-	      	if (resFile.good()) {
-		      	cerr << "//////////////////////////////////////////////////////////////////////////////\n";
-		      	cerr << "\nOpened file: " << resFilename << endl;
-		      	resFile.open(resFilename);
-
-		      	ifstream resFile(resFilename, std::ios::binary);
-		      	vector<char> payload((std::istreambuf_iterator<char>(resFile)),
-		      		std::istreambuf_iterator<char>());
-		      	cout<<"size: "<<payload.size()<<endl;
-		      	//string payloadStr(payload.begin(), payload.end());
-		      	//int payloadSize = payload.size();
-
-		      	seqNumRes++;
-		      	vector<char>::iterator packetPoint = payload.begin();
-
-		      	//this will break the file up into small packets to be sent over
-		      	while(packetPoint < payload.end()) {
-		      		ackRes++;
-		      		int end = (payload.end() - packetPoint > 1024) ? 1024 : (payload.end() - packetPoint);
-		      		vector<char> packet_divide(packetPoint, packetPoint + end);
-		      		packetPoint += end;
-		      		
-
-		      		TcpPacket* tcpfile = new TcpPacket(seqNumRes, ackRes, INIT_CWND_SIZE, flags, packet_divide);
-		      		seqNumRes += tcpfile->getData().size();
-		      		cout<<"sequencenum: "<<seqNumRes<<endl;
-		      		vector<char> tcpfile_packet = tcpfile->buildPacket();
-				    // Sending response object
-		      		if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
-		      			(socklen_t)sizeof(clientAddr)) == -1) {
-		      			perror("send error");
-		      			return 1;
-		      		}
-		      		delete tcpfile;
-		      	}
-		      	cerr << "GOT to the end \n";
-	  		}
-	  		resFile.close();
 		}
-
 	}
+
+  	string resFilename = "index.html";
+
+  	// Prepending starting directory to requested filename
+  	//resFilename.insert(0, tFiledir);
+
+  	cerr << "trying to get file from path: " << resFilename << endl;
+  	ifstream resFile (resFilename, ios::in|ios::binary);
+
+  	if (resFile.good()) {
+      	cerr << "//////////////////////////////////////////////////////////////////////////////\n";
+      	cerr << "\nOpened file: " << resFilename << endl;
+      	resFile.open(resFilename);
+
+      	ifstream resFile(resFilename, std::ios::binary);
+      	vector<char> payload((std::istreambuf_iterator<char>(resFile)),
+      		std::istreambuf_iterator<char>());
+      	cout<<"size: "<<payload.size()<<endl;
+      	//string payloadStr(payload.begin(), payload.end());
+      	//int payloadSize = payload.size();
+
+      	seqNumRes++;
+      	vector<char>::iterator packetPoint = payload.begin();
+
+      	//this will break the file up into small packets to be sent over
+      	while(packetPoint < payload.end()) {
+      		ackRes++;
+      		int end = (payload.end() - packetPoint > 1024) ? 1024 : (payload.end() - packetPoint);
+      		vector<char> packet_divide(packetPoint, packetPoint + end);
+      		packetPoint += end;
+      		
+
+      		TcpPacket* tcpfile = new TcpPacket(seqNumRes, ackRes, INIT_CWND_SIZE, flags, packet_divide);
+      		seqNumRes += tcpfile->getData().size();
+      		cout<<"sequencenum: "<<seqNumRes<<endl;
+      		vector<char> tcpfile_packet = tcpfile->buildPacket();
+		    // Sending response object
+      		if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
+      			(socklen_t)sizeof(clientAddr)) == -1) {
+      			perror("send error");
+      			return 1;
+      		}
+      		delete tcpfile;
+      	}
+      	cerr << "Sent over file \n";
+	}
+	resFile.close();
+
 	close(sockfd);
 	return 0;
 }

@@ -75,6 +75,9 @@ int main(int argc, char* argv[])
   	char * buf = new char[buf_size];
 	memset(buf,'\0',sizeof(buf));
 
+	int CURRENT_SEQ_NUM;
+	int CURRENT_ACK_NUM;
+
     // Setting up TCP connection
     if (!establishedTCP) {
 	    uint16_t seqNum = 1; // change to rand() % MAX_SEQ_NUM;
@@ -99,7 +102,7 @@ int main(int argc, char* argv[])
 	    if(bytesRec == -1){
 		    perror("error receiving");
 		    return 1;
-    	}
+	    }
       	cout<<"received"<<buf<<endl;
 
       	// Finished receiving header
@@ -129,6 +132,10 @@ int main(int argc, char* argv[])
 		            delete res;
 		            cerr << "Established TCP connection after 3 way handshake\n";
 		            establishedTCP = true;
+			    CURRENT_SEQ_NUM = seqNumRes + 1;
+			    cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
+			    CURRENT_ACK_NUM = header->getSeqNum() + 1;
+			    cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
 	          	}
 
 	         	delete header;
@@ -148,8 +155,33 @@ int main(int argc, char* argv[])
 	      		}
 	      		vector<char> recv_data(buf, buf+buf_size);
 	      		TcpPacket recv_packet(recv_data);
-	      		cout<<"sequencenum: "<<recv_packet.getSeqNum()<<endl;
-	      		output << recv_packet.getData();
+	      		cout<<"Received packet w/ SEQ Num: " << recv_packet.getSeqNum() <<", ACK Num: " << recv_packet.getAckNum() << endl;
+
+			if (CURRENT_ACK_NUM = recv_packet.getSeqNum()) {
+			  output << recv_packet.getData();
+			  CURRENT_ACK_NUM += recv_packet.getData().size(); //Bytes received
+			}
+
+			//Send ACK
+			if (CURRENT_SEQ_NUM = recv_packet.getAckNum()) {
+			
+			  vector<char> data;
+			  uint16_t flags = 0x4; //ACK flag
+
+			  TcpPacket* ackPacket = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+			  cout << "Sending ACK w/ SEQ Num: " << CURRENT_SEQ_NUM << ", ACK Num: " << CURRENT_ACK_NUM << endl << endl;
+			  
+			  CURRENT_SEQ_NUM++; //Increment; only sending an ACK
+			  
+			  vector<char> ackPacketVector = ackPacket->buildPacket();
+			  //Send ACK to server
+			  if (sendto(sockfd, &ackPacketVector[0], ackPacketVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
+		              	perror("Error while sending ACK");
+		              	return 1;
+			  }
+			}
+
+
 	      	}
 	      	output.close();
 

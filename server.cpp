@@ -69,6 +69,9 @@ int main()
   	uint16_t seqNumRes = 0; //rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
   	uint16_t flags = 0x00;
 
+	int CURRENT_SEQ_NUM;
+	int CURRENT_ACK_NUM;
+
   	bool placeholder = true;
   	while(placeholder){
   		placeholder = false;
@@ -90,7 +93,7 @@ int main()
 	  			if (header->getSynFlag() && !(header->getAckFlag()) && !startedHandshake) {
 	  				cerr << "Received TCP setup packet\n";
 	  				startedHandshake = true;
-	  				ackRes = header->getAckNum() + 1;
+	  				ackRes = header->getSeqNum() + 1; //I think SEQ, not ACK??
 		          	seqNumRes = 1; //rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
 		          	flags = 0x06;
 		          	vector<char> data;
@@ -103,9 +106,14 @@ int main()
 		      		}
 		      		delete res;
 		  		}
+
 			  	if (header->getAckNum() == seqNumRes + 1) {
 			  		cerr << "Established TCP connection after 3 way handshake\n";
 			  		establishedTCP = true;
+					CURRENT_SEQ_NUM = seqNumRes + 1;
+					cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
+					CURRENT_ACK_NUM = header->getSeqNum() + 1;
+					cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
 			  	}
 
 			 	delete header;
@@ -142,20 +150,22 @@ int main()
 		      	//string payloadStr(payload.begin(), payload.end());
 		      	//int payloadSize = payload.size();
 
-		      	seqNumRes++;
+
 		      	vector<char>::iterator packetPoint = payload.begin();
 
 		      	//this will break the file up into small packets to be sent over
 		      	while(packetPoint < payload.end()) {
-		      		ackRes++;
+
 		      		int end = (payload.end() - packetPoint > 1024) ? 1024 : (payload.end() - packetPoint);
 		      		vector<char> packet_divide(packetPoint, packetPoint + end);
 		      		packetPoint += end;
 		      		
+				flags = 0x4; //ACK flag
 
-		      		TcpPacket* tcpfile = new TcpPacket(seqNumRes, ackRes, INIT_CWND_SIZE, flags, packet_divide);
-		      		seqNumRes += tcpfile->getData().size();
-		      		cout<<"sequencenum: "<<seqNumRes<<endl;
+		      		TcpPacket* tcpfile = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, packet_divide);
+
+		      		cout<<"Sending packet w/ SEQ Num: "<< CURRENT_SEQ_NUM <<", ACK Num: " << CURRENT_ACK_NUM <<endl;
+
 		      		vector<char> tcpfile_packet = tcpfile->buildPacket();
 				    // Sending response object
 		      		if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
@@ -163,7 +173,27 @@ int main()
 		      			perror("send error");
 		      			return 1;
 		      		}
+
+		      		CURRENT_SEQ_NUM += tcpfile->getData().size();				
 		      		delete tcpfile;
+				
+				//Listen for ACK
+				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+				if(bytesRec == -1){
+				  perror("Error while listening for ACK");
+				  return 1;
+				}
+
+				vector<char> recv_data(buf, buf+buf_size);
+				TcpPacket recv_packet(recv_data);
+				cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
+
+				if (CURRENT_ACK_NUM = recv_packet.getSeqNum()) {
+				  CURRENT_ACK_NUM++; //Received ACK
+				}
+
+				
+
 		      	}
 		      	cerr << "GOT to the end \n";
 	  		}

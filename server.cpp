@@ -202,7 +202,70 @@ int main()
 
 
 				}
-				cerr << "GOT to the end \n";
+				cerr << "GOT to the end of the file\n\n";
+
+				//Sending FIN ACK
+				flags = 0x5;
+				vector<char> data;
+				TcpPacket* finAck = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+				cout<<"Sending FIN ACK w/ SEQ Num: "<<CURRENT_SEQ_NUM<<", ACK Num: "<<CURRENT_ACK_NUM<<endl;
+				vector<char> finAckVector = finAck->buildPacket();
+				if (sendto(sockfd, &finAckVector[0], finAckVector.size(), 0, (struct sockaddr *)&clientAddr, (socklen_t)sizeof(clientAddr)) == -1) {
+				  perror("send error");
+				  return 1;
+				}
+
+				CURRENT_SEQ_NUM++; //Only increment by 1 bc only sent FIN ACK
+				delete finAck;
+
+				//Now in FIN_WAIT_1 State, waiting for an ACK
+				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+				if (bytesRec == -1) {
+				  perror("Error while listening for ACK");
+				  return 1;
+				}
+				vector<char> recv_data(buf, buf+buf_size);
+				TcpPacket recv_packet(recv_data);
+				cout<<"Received ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
+				if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
+				  CURRENT_ACK_NUM++; //Received ACK
+				}
+
+				//Now in FIN_WAIT_2 State, waiting for a FIN ACK
+				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+				if (bytesRec == -1) {
+				  perror("Error while listening for FIN ACK");
+				  return 1;
+				}
+				vector<char> recv_data2(buf, buf+buf_size);
+				TcpPacket recv_packet2(recv_data2);
+				if (recv_packet2.getFinFlag()) {
+
+				  cout<<"Received FIN ACK w/ SEQ Num: "<<recv_packet2.getSeqNum()<<", ACK Num: "<<recv_packet2.getAckNum()<<endl;
+				  if (CURRENT_ACK_NUM == recv_packet2.getSeqNum()) {
+				    CURRENT_ACK_NUM++; //Received FIN ACK
+				  }
+
+				  //Sending final ACK
+				  flags = 0x4; //ACK
+				  TcpPacket* finalAck = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+				  cout<<"Sending final ACK w/ SEQ Num: "<<CURRENT_SEQ_NUM<<", ACK Num: "<<CURRENT_ACK_NUM<<endl<<endl;
+				  vector<char> finalAckVector = finalAck->buildPacket();
+				  if (sendto(sockfd, &finalAckVector[0], finalAckVector.size(), 0, (struct sockaddr *)&clientAddr, (socklen_t)sizeof(clientAddr)) == -1) {
+				    perror("send error");
+				    return 1;
+				  }
+				  
+				  CURRENT_SEQ_NUM++; //Only increment by 1 bc only sent FIN ACK
+				  delete finalAck;
+				  
+				  cout<<"Closing connection. TIME_WAIT state has yet to be implemented.\n\n";
+				  
+				  
+				} else {
+				  perror("Error; expected FIN ACK packet");
+				  return 1;
+				}
 			}
 			resFile.close();
 		}

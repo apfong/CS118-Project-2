@@ -56,8 +56,8 @@ int main()
 	//   perror("listen");
 	//   return 3;
 	// }
-	const int buf_size = 1032;
-	char * buf = new char[buf_size];
+	const int MAX_PKT_LEN = 1032;
+	char * buf = new char[MAX_PKT_LEN];
 	memset(buf,'\0',sizeof(buf));
 	cout<<"start recv"<<endl;
 	struct sockaddr_in clientAddr;
@@ -71,7 +71,7 @@ int main()
 
 	while(true){
 		bytesRec = 0;
-		bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+		bytesRec = recvfrom(sockfd, buf, MAX_PKT_LEN, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 		if(bytesRec == -1){
 			perror("error receiving");
 			return 1;
@@ -82,7 +82,7 @@ int main()
 		if (bytesRec == 8) {
 			// Dealing with 3 way handshake headers
 			if (!establishedTCP) {
-				vector<char> bufVec(buf, buf+buf_size);
+				vector<char> bufVec(buf, buf+MAX_PKT_LEN);
 				TcpPacket* header = new TcpPacket(bufVec);
 
 				// if SYN=1 and ACK=0
@@ -105,7 +105,7 @@ int main()
 
 				/*
 				// Receiving setup ACK
-				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+				bytesRec = recvfrom(sockfd, buf, MAX_PKT_LEN, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 				if(bytesRec == -1){
 				perror("error receiving");
 				return 1;
@@ -184,13 +184,13 @@ int main()
 					delete tcpfile;
 
 					//Listen for ACK
-					bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+					bytesRec = recvfrom(sockfd, buf, MAX_PKT_LEN, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 					if(bytesRec == -1){
 						perror("Error while listening for ACK");
 						return 1;
 					}
 
-					vector<char> recv_data(buf, buf+buf_size);
+					vector<char> recv_data(buf, buf+MAX_PKT_LEN);
 					TcpPacket recv_packet(recv_data);
 					cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
 
@@ -218,12 +218,12 @@ int main()
 				delete finAck;
 
 				//Now in FIN_WAIT_1 State, waiting for an ACK
-				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+				bytesRec = recvfrom(sockfd, buf, MAX_PKT_LEN, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 				if (bytesRec == -1) {
 				  perror("Error while listening for ACK");
 				  return 1;
 				}
-				vector<char> recv_data(buf, buf+buf_size);
+				vector<char> recv_data(buf, buf+MAX_PKT_LEN);
 				TcpPacket recv_packet(recv_data);
 				cout<<"Received ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
 				if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
@@ -231,12 +231,12 @@ int main()
 				}
 
 				//Now in FIN_WAIT_2 State, waiting for a FIN ACK
-				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+				bytesRec = recvfrom(sockfd, buf, MAX_PKT_LEN, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 				if (bytesRec == -1) {
 				  perror("Error while listening for FIN ACK");
 				  return 1;
 				}
-				vector<char> recv_data2(buf, buf+buf_size);
+				vector<char> recv_data2(buf, buf+MAX_PKT_LEN);
 				TcpPacket recv_packet2(recv_data2);
 				if (recv_packet2.getFinFlag()) {
 

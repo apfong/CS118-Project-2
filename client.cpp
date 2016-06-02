@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <fstream>
+#include <sys/fcntl.h>
 #include "tcp_message.cpp"
 using namespace std;
 
@@ -77,72 +78,100 @@ int main(int argc, char* argv[])
 
 	int CURRENT_SEQ_NUM = 0;//rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
 	int CURRENT_ACK_NUM = 0;
+	
+	// Variables for timeout using select
+	// ioctlsocket(FIONBIO)/fcntl(O_NONBLOCK), need this for non-blocking sockets?
+	// need to create separate fd_set for each packet? how to set individual timeouts?
+//	vector<int> packetFds;
+//	packetFds.push(sockfd);
+	struct timeval timeout;
+	timeout.tv_sec = 2;
+	timeout.tv_usec = 500000; // 500ms
+	bool gotSynAck = false;
+	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
+		cerr << "setsockopt failed\n";
+
 
 	// Setting up TCP connection
-	if (!establishedTCP) {
-		uint16_t flags = 0x02;
-		vector<char> data;
-		TcpPacket* initTCP = new TcpPacket(CURRENT_SEQ_NUM, 0, 0, flags, data);
-		vector<char> initPacket = initTCP->buildPacket();
-		cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
-		cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
-		if (sendto(sockfd, &initPacket[0], initPacket.size(), 0, (struct sockaddr *)&serverAddr,
-					(socklen_t)sizeof(serverAddr)) == -1) {
-			perror("send error");
-			return 1;
-		}
-		delete initTCP;
+	uint16_t flags = 0x02;
+	vector<char> data;
+	TcpPacket* initTCP = new TcpPacket(CURRENT_SEQ_NUM, 0, 0, flags, data);
+	vector<char> initPacket = initTCP->buildPacket();
+	cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
+	cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
+	if (sendto(sockfd, &initPacket[0], initPacket.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
+		perror("send error");
+		return 1;
 	}
 
-	// After sending out syn packet
+	// After sending out syn packet, keep resending if timeout reached before receiving response
 	bool placeholder = true;
 	while (placeholder) {
 		placeholder = false;
-		bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize);
-		cout<<"start recv"<<endl;
-		if(bytesRec == -1){
-			perror("error receiving");
-			return 1;
-		}
-		cout<<"received"<<buf<<endl;
 
-		// Finished receiving header
-		if (bytesRec == 8) {
-			// Dealing with 3 way handshake headers
-			if (!establishedTCP) {
-				vector<char> bufVec(buf, buf+buf_size);
-				TcpPacket* header = new TcpPacket(bufVec);
-
-				// if SYN=1 and ACK=1
-				if (header->getSynFlag() && (header->getAckFlag())) {
-					cerr << "Received TCP setup packet\n";
-					CURRENT_SEQ_NUM++;
-					cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
-					CURRENT_ACK_NUM = header->getSeqNum() + 1;
-					cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
-					uint16_t flags = 0x06;
-					vector<char> data;
-					TcpPacket* res = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
-					vector<char> resPacket = res->buildPacket();
-					if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&serverAddr,
-								(socklen_t)sizeof(serverAddr)) == -1) {
+		while (!gotSynAck) {
+			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize);
+			if (bytesRec == -1) {
+				if (EWOULDBLOCK) {
+					cerr << "Timed out, resending syn\n";
+					if (sendto(sockfd, &initPacket[0], initPacket.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
 						perror("send error");
 						return 1;
 					}
-					delete res;
-					cerr << "Established TCP connection after 3 way handshake\n";
-					establishedTCP = true;
+				} else {
+					perror("error receiving");
+					return 1;
 				}
+			} 
+			if (bytesRec == 8) {
+				// Dealing with 3 way handshake headers
+				if (!establishedTCP) {
+					vector<char> bufVec(buf, buf+buf_size);
+					TcpPacket* header = new TcpPacket(bufVec);
 
-				delete header;
+					// if SYN=1 and ACK=1
+					if (header->getSynFlag() && (header->getAckFlag())) {
+						cerr << "Received TCP setup packet\n";
+						gotSynAck = true;
+						delete initTCP;
+						CURRENT_SEQ_NUM++;
+						cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
+						CURRENT_ACK_NUM = header->getSeqNum() + 1;
+						cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
+						uint16_t flags = 0x06;
+						vector<char> data;
+						TcpPacket* res = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+						vector<char> resPacket = res->buildPacket();
+						if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&serverAddr,
+									(socklen_t)sizeof(serverAddr)) == -1) {
+							perror("send error");
+							return 1;
+						}
+						delete res;
+						cerr << "Established TCP connection after 3 way handshake\n";
+						establishedTCP = true;
+						if (setsockopt (sockfd, SOL_SOCKET, 0, NULL, NULL) < 0)
+							cerr << "setsockopt failed\n";
+					}
+					delete header;
+				}
 			}
+		}
+
+		// Finished receiving header
+		if (bytesRec == 8 && establishedTCP) {
+			cerr << "Received some bytes: " << bytesRec << endl;
 
 			ofstream output("copiedfile.html");
 			// Get rest of data: UDP packets holding TCP packets
 			while((bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize))){
 				if(bytesRec == -1){
-					perror("file receive error");
-					return 1;
+					if (EWOULDBLOCK) {
+						cerr << "";
+					} else {
+						perror("file receive error");
+						return 1;
+					}
 				}
 				if(bytesRec == 0){
 					cerr << "no more to read"<<endl;
@@ -220,8 +249,13 @@ int main(int argc, char* argv[])
 			//Listen for final ACK
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize);
 			if (bytesRec == -1) {
-			  perror("Error while listening for final ACK");
-			  return 1;
+				if (EWOULDBLOCK) {
+					cerr << "";
+				}
+				else {
+					perror("Error while listening for final ACK");
+					return 1;
+				}
 			}
 			vector<char> recv_data(buf, buf+buf_size);
 			TcpPacket recv_packet(recv_data);

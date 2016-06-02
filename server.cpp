@@ -19,6 +19,7 @@ const uint16_t MAX_PKT_LEN = 1032;
 const uint16_t MAX_SEQ_NUM = 30720;
 const uint16_t INIT_CWND_SIZE = 1024;
 const uint16_t INIT_SS_THRESH = 30720;
+const uint16_t CWND_MAX_SIZE = INIT_SS_THRESH/2;
 const uint16_t RETRANS_TIMEOUT = 500;
 // basic client's receiver window can always be 30720, but server should be
 // able to properly handle cases when the window is reduced
@@ -56,7 +57,6 @@ int main()
 	//   perror("listen");
 	//   return 3;
 	// }
-	const int MAX_PKT_LEN = 1032;
 	char * buf = new char[MAX_PKT_LEN];
 	memset(buf,'\0',sizeof(buf));
 	cout<<"start recv"<<endl;
@@ -66,8 +66,12 @@ int main()
 	bool establishedTCP = false;
 	bool startedHandshake = false;
 	uint16_t flags = 0x00;
+	uint16_t cwnd_size = INIT_CWND_SIZE;
+	int cwnd_pos = 0;
+	uint16_t ss_thresh = INIT_SS_THRESH;
 	int CURRENT_SEQ_NUM = 0;//rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
 	int CURRENT_ACK_NUM = 0;
+	bool slow_start = true;
 
 	while(true){
 		bytesRec = 0;
@@ -126,17 +130,7 @@ int main()
 				//continue; // keep receiving new packets, until handshake is established
 			}
 
-			// Preparing to open file
-			//stringstream filestream;
-			//string line;
-
 			string resFilename = "index.html";
-			//streampos size;
-
-			// Dealing with root file request
-			if (resFilename == "/") {
-				resFilename += "index.html";
-			}
 
 			// Prepending starting directory to requested filename
 			//resFilename.insert(0, tFiledir);
@@ -145,7 +139,7 @@ int main()
 			ifstream resFile (resFilename, ios::in|ios::binary);
 
 			if (resFile.good()) {
-				cerr << "//////////////////////////////////////////////////////////////////////////////\n";
+				cerr << "\n//////////////////////////////////////////////////////////////////////////////\n";
 				cerr << "\nOpened file: " << resFilename << endl;
 				resFile.open(resFilename);
 
@@ -162,40 +156,59 @@ int main()
 				//this will break the file up into small packets to be sent over
 				while(packetPoint < payload.end()) {
 
-					int end = (payload.end() - packetPoint > 1024) ? 1024 : (payload.end() - packetPoint);
-					vector<char> packet_divide(packetPoint, packetPoint + end);
-					packetPoint += end;
+					while(packetPoint-payload.begin() < cwnd_pos + cwnd_size){
+						int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);
+						vector<char> packet_divide(packetPoint, packetPoint + end);
+						packetPoint += end;
 
-					flags = 0x4; //ACK flag
+						flags = 0x4; //ACK flag
+						TcpPacket* tcpfile = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, packet_divide);
+						cout<<"Sending packet w/ SEQ Num: "<< CURRENT_SEQ_NUM <<", ACK Num: " << CURRENT_ACK_NUM <<endl;
 
-					TcpPacket* tcpfile = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, packet_divide);
+						vector<char> tcpfile_packet = tcpfile->buildPacket();
+						// Sending response object
+						if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
+									(socklen_t)sizeof(clientAddr)) == -1) {
+							perror("send error");
+							return 1;
+						}
+						cout<<"packet sent, waiting for receive"<<endl;
 
-					cout<<"Sending packet w/ SEQ Num: "<< CURRENT_SEQ_NUM <<", ACK Num: " << CURRENT_ACK_NUM <<endl;
-
-					vector<char> tcpfile_packet = tcpfile->buildPacket();
-					// Sending response object
-					if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
-								(socklen_t)sizeof(clientAddr)) == -1) {
-						perror("send error");
-						return 1;
+						CURRENT_SEQ_NUM += tcpfile->getData().size();				
+						delete tcpfile;
 					}
 
-					CURRENT_SEQ_NUM += tcpfile->getData().size();				
-					delete tcpfile;
+					while(){
+						//Listen for ACK
+						bytesRec = recvfrom(sockfd, buf, MAX_PKT_LEN, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+						if(bytesRec == -1){
+							perror("Error while listening for ACK");
+							return 1;
+						}
 
-					//Listen for ACK
-					bytesRec = recvfrom(sockfd, buf, MAX_PKT_LEN, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
-					if(bytesRec == -1){
-						perror("Error while listening for ACK");
-						return 1;
+						vector<char> recv_data(buf, buf+MAX_PKT_LEN);
+						TcpPacket recv_packet(recv_data);
+						cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
+
+						if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
+							CURRENT_ACK_NUM++; //Received ACK
+						}
+						if(timeout){
+							cwnd_size = cwnd_size - cwnd_size % INIT_CWND_SIZE;
+							ss_thresh = cwnd_size/2;
+							cwnd_size = INIT_CWND_SIZE;
+							slow_start = true;
+
+						}
 					}
 
-					vector<char> recv_data(buf, buf+MAX_PKT_LEN);
-					TcpPacket recv_packet(recv_data);
-					cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
-
-					if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
-						CURRENT_ACK_NUM++; //Received ACK
+					if(slow_start){
+						cwnd_size += INIT_CWND_SIZE;
+						if(cwnd_size >= ss_thresh)
+							slow_start = false;
+					}
+					else{
+						cwnd_size += INIT_CWND_SIZE/(cwnd_size - cwnd_size % INIT_CWND_SIZE);
 					}
 
 

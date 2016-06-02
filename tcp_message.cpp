@@ -279,7 +279,7 @@ void PSTList::handleAck(uint16_t seqNum) {
     for (it = pairs.begin(); it != pairs.end(); it++) {
         if ((*it)->seqNum == seqNum) {
             lastAck = (*it)->packetAckNum;
-            break;
+            return;
         }
     }
     //Should never reach here; error messages for now

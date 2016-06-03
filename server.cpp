@@ -169,7 +169,7 @@ int main()
 
 				vector<char> tcpfile_packet = tcpfile->buildPacket();
 				// Sending response object
-				//pstList->handleNewSend(tcpfile);
+				pstList->handleNewSend(tcpfile);
 				if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
 							(socklen_t)sizeof(clientAddr)) == -1) {
 					perror("send error");
@@ -181,7 +181,7 @@ int main()
 				//delete tcpfile;
 
 				// Listen for ACK
-				//timeout = pstList->getTimeout();
+				timeout = pstList->getTimeout();
 				cerr << "Current timeout timer: " << timeout.tv_usec/1000 << endl;
 				if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
 					cerr << "setsockopt failed when setting it to " << timeout.tv_usec/1000 << "ms\n";
@@ -207,7 +207,7 @@ int main()
 				vector<char> recv_data(buf, buf+buf_size);
 				TcpPacket recv_packet(recv_data);
 				cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
-				//pstList->handleAck(recv_packet.getAckNum());
+				pstList->handleAck(recv_packet.getAckNum());
 
 				cwnd_pos = recv_packet.getAckNum();
 

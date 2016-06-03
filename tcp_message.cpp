@@ -3,11 +3,28 @@
 #include <set>
 
 using namespace std;
+/*
+ #include <cassert>
+ #include <iostream>
+ #include <sys/time.h>
+ #include <netinet/in.h>
+ */
+
+#include <string.h>
+#include <thread>
+#include <iostream>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <fstream>
 
 #include <cassert>
-#include <iostream>
 #include <sys/time.h>
-#include <netinet/in.h>
 
 
 //==========================================//
@@ -254,6 +271,9 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
     uint16_t ackSeqNum = new_packet->getSeqNum() + new_packet->getDataSize();
     //TODO: CHECK IF IT GOES PAST MAX SEQ NUM??
     
+    if (pairs.empty()) {
+        pairs.push_back(new Pair(new_packet->getSeqNum(), 0));
+    }
     pairs.push_back(new Pair(ackSeqNum, numPackets));
     
     numPackets++;
@@ -261,6 +281,7 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
 
 void PSTList::handleTimeout() {
     vector<char> resendPacket = head->packet->buildPacket();
+    cout << "Resending packet w/ SEQ NUM: " << head->packet->getSeqNum() << ", ACK Num: " << head->packet->getAckNum() << endl << endl;
     if (sendto(m_sockfd, &resendPacket[0], resendPacket.size(), 0, (struct sockaddr *)&m_clientAddr, (socklen_t)sizeof(m_clientAddr)) == -1) {
         perror("ERROR: Error while resending packet"); //Error message for now; can't return 1??
     }

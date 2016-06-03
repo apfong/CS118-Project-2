@@ -183,7 +183,7 @@ int main()
 				//delete tcpfile;
 
 				// Listen for ACK
-				//timeout = pstList->getTimeout();
+				timeout = pstList->getTimeout();
 				cerr << "Current timeout timer: " << timeout.tv_usec/1000 << endl;
 				if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
 					cerr << "setsockopt failed when setting it to " << timeout.tv_usec/1000 << "ms\n";

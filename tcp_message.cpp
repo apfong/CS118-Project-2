@@ -5,6 +5,8 @@ using namespace std;
 
 #include <cassert>
 #include <iostream>
+#include <sys/time.h>
+#include <netinet/in.h>
 
 
 //==========================================//
@@ -22,10 +24,11 @@ public:
     bool getAckFlag();
     bool getSynFlag();
     bool getFinFlag();
-
-    string getData();
+    
+    uint16_t getDataSize();
     
     vector<char> buildPacket();
+    string getData();
     
     void testPrint();
     
@@ -35,7 +38,6 @@ private:
     uint16_t window;
     uint16_t flags; //xxxxxxxxxxxxxASF
     vector<char> data;
-    bool retransmit;
 };
 
 TcpPacket::TcpPacket(uint16_t s, uint16_t a, uint16_t w, uint16_t f, vector<char> d) {
@@ -44,7 +46,6 @@ TcpPacket::TcpPacket(uint16_t s, uint16_t a, uint16_t w, uint16_t f, vector<char
     window = w;
     flags = f;
     data = d;
-    retransmit = true;
 }
 
 TcpPacket::TcpPacket(vector<char> vec) {
@@ -58,12 +59,11 @@ TcpPacket::TcpPacket(vector<char> vec) {
     for (it = (vec.begin()+8); it != vec.end(); it++) {
         data.push_back(*it);
     }
-    retransmit = true;
     
 }
 
 string TcpPacket::getData(){
-    string s(data.begin(),data.end());
+    string s(data.begin(), data.end());
     return s;
 }
 
@@ -92,6 +92,10 @@ bool TcpPacket::getSynFlag() {
 bool TcpPacket::getFinFlag() {
     uint16_t mask = 1<<0;
     return (flags & mask);
+}
+
+uint16_t TcpPacket::getDataSize() {
+    return data.size();
 }
 
 vector<char> TcpPacket::buildPacket() {
@@ -145,65 +149,242 @@ void TcpPacket::testPrint() {
 // }
 
 
+//==========================================//
+//============PSTNode=======================//
+//==========================================//
+
+long timestamp() {
+    timeval* t = new timeval;
+    gettimeofday(t, NULL);
+    long ret = ((long)t->tv_sec)*1000 + ((long)t->tv_usec)/1000;
+    delete t;
+    return ret;
+}
+
+class PSTNode {
+public:
+    PSTNode(TcpPacket* p, long t, int id, PSTNode* n);
+    
+    TcpPacket* packet;
+    
+    long timeSent;
+    int packetNum;
+    
+    PSTNode* next;
+};
+
+PSTNode::PSTNode(TcpPacket* p, long t, int id, PSTNode* n) {
+    packet = p;
+    
+    timeSent = t;
+    packetNum = id;
+    
+    next = n;
+}
 
 
 
+//==========================================//
+//============Pair==========================//
+//==========================================//
+class Pair {
+public:
+    Pair(uint16_t s, int p);
+    
+    uint16_t seqNum;
+    int packetAckNum;
+};
+
+Pair::Pair(uint16_t s, int p) {
+    seqNum = s;
+    packetAckNum = p;
+}
 
 
+//==========================================//
+//============PSTList=======================//
+//==========================================//
+
+class PSTList {
+public:
+    PSTList(int sockfd, sockaddr_in clientAddr);
+    //TODO: DESTRUCTOR
+    
+    void handleNewSend(TcpPacket* new_packet);
+    void handleTimeout();
+    void handleAck(uint16_t seqNum);
+    
+    timeval getTimeout();
+private:
+    int m_sockfd;
+    sockaddr_in m_clientAddr;
+    
+    PSTNode* head;
+    PSTNode* tail;
+    int numPackets;
+    int lastAck;
+    vector<Pair*> pairs;
+};
+
+PSTList::PSTList(int sockfd, sockaddr_in clientAddr) {
+    m_sockfd = sockfd;
+    m_clientAddr = clientAddr;
+    
+    head = nullptr;
+    tail = nullptr;
+    numPackets = 1;
+    lastAck = 0;
+}
+
+
+void PSTList::handleNewSend(TcpPacket* new_packet) {
+    if (head == nullptr) { //if empty list
+        
+        head = new PSTNode(new_packet, timestamp(), numPackets, nullptr);
+        tail = head;
+        
+    } else { //at least one node
+        
+        tail->next = new PSTNode(new_packet, timestamp(), numPackets, nullptr);
+        tail = tail->next;
+        
+    }
+    
+    uint16_t ackSeqNum = new_packet->getSeqNum() + new_packet->getDataSize();
+    //TODO: CHECK IF IT GOES PAST MAX SEQ NUM??
+    
+    pairs.push_back(new Pair(ackSeqNum, numPackets));
+    
+    numPackets++;
+}
+
+void PSTList::handleTimeout() {
+    vector<char> resendPacket = head->packet->buildPacket();
+    if (sendto(m_sockfd, &resendPacket[0], resendPacket.size(), 0, (struct sockaddr *)&m_clientAddr, (socklen_t)sizeof(m_clientAddr)) == -1) {
+        perror("ERROR: Error while resending packet"); //Error message for now; can't return 1??
+    }
+    
+    head->timeSent = timestamp();
+    
+    if (head != tail) { //only do the rest if there's two or more nodes --> need to reorder the list
+        
+        tail->next = head;
+        tail = head;
+        
+        head = head->next;
+        tail->next = nullptr;
+        
+    }
+}
+
+
+
+void PSTList::handleAck(uint16_t seqNum) {
+    
+    vector<Pair*>::iterator it;
+    for (it = pairs.begin(); it != pairs.end(); it++) {
+        if ((*it)->seqNum == seqNum) {
+            lastAck = (*it)->packetAckNum;
+            return;
+        }
+    }
+    //Should never reach here; error messages for now
+    cout << "ERROR: SHOULD NEVER REACH THIS PART OF THE CODE" << endl;
+}
+
+
+
+timeval PSTList::getTimeout() {
+    
+    while (head != nullptr && head->packetNum <= lastAck) {
+        PSTNode* temp = head;
+        head = head->next;
+        
+        delete temp->packet;
+        delete temp;
+    }
+    
+    timeval t;
+    
+    if (head == nullptr) { //Calling timeout on an empty list; shouldn't happen; error message for now
+        cout << "ERROR: This should never happen? Timeout but empty list" << endl;
+        t.tv_sec = 0;
+        t.tv_usec = 0;
+        return t;
+    }
+    
+    long ms = head->timeSent + 500 - timestamp(); //How many ms left until timeout
+    
+    if (ms < 0) { //Shouldn't happen, I think?
+        cout << "ERROR: Timeout sould never be less than 0?" << endl;
+        ms = 0;
+    }
+    
+    t.tv_sec = 0;
+    t.tv_usec = ms*1000;
+    
+    return t;
+}
+
+
+
+//TODO: DESTRUCTOR
 
 
 
 /*
-int main() {
-    
-    vector<char> data;
-    data.push_back('h');
-    data.push_back('e');
-    data.push_back('l');
-    data.push_back('l');
-    data.push_back('o');
-    
-    TcpPacket test_flags_101(3, 9, 12, 5, data);
-    assert(test_flags_101.getSeqNum() == 3);
-    assert(test_flags_101.getAckNum() == 9);
-    assert(test_flags_101.getWindow() == 12);
-    
-    assert(test_flags_101.getAckFlag());
-    assert(!test_flags_101.getSynFlag());
-    assert(test_flags_101.getFinFlag());
-    
-    TcpPacket test_flags_010(3, 9, 12, 2, data);
-    assert(!test_flags_010.getAckFlag());
-    assert(test_flags_010.getSynFlag());
-    assert(!test_flags_010.getFinFlag());
-    
-    TcpPacket test(3, 9, 12, 5, data);
-    TcpPacket test2(test.buildPacket());
-    test2.testPrint();
-    
-    assert(test.getSeqNum() == 3);
-    assert(test.getAckNum() == 9);
-    assert(test.getWindow() == 12);
-    
-    assert(test.getAckFlag());
-    assert(!test.getSynFlag());
-    assert(test.getFinFlag());
-    
-    assert(test2.getSeqNum() == 3);
-    assert(test2.getAckNum() == 9);
-    assert(test2.getWindow() == 12);
-    
-    assert(test2.getAckFlag());
-    assert(!test2.getSynFlag());
-    assert(test2.getFinFlag());
-    
-    
-    cout << "Passed all tests!\n";
-    
-}
-*/
-
-
+ 
+ int main() {
+ 
+ vector<char> data;
+ data.push_back('h');
+ data.push_back('e');
+ data.push_back('l');
+ data.push_back('l');
+ data.push_back('o');
+ 
+ TcpPacket test_flags_101(3, 9, 12, 5, data);
+ assert(test_flags_101.getSeqNum() == 3);
+ assert(test_flags_101.getAckNum() == 9);
+ assert(test_flags_101.getWindow() == 12);
+ 
+ assert(test_flags_101.getAckFlag());
+ assert(!test_flags_101.getSynFlag());
+ assert(test_flags_101.getFinFlag());
+ 
+ TcpPacket test_flags_010(3, 9, 12, 2, data);
+ assert(!test_flags_010.getAckFlag());
+ assert(test_flags_010.getSynFlag());
+ assert(!test_flags_010.getFinFlag());
+ 
+ TcpPacket test(3, 9, 12, 5, data);
+ TcpPacket test2(test.buildPacket());
+ test2.testPrint();
+ 
+ assert(test.getSeqNum() == 3);
+ assert(test.getAckNum() == 9);
+ assert(test.getWindow() == 12);
+ 
+ assert(test.getAckFlag());
+ assert(!test.getSynFlag());
+ assert(test.getFinFlag());
+ 
+ assert(test2.getSeqNum() == 3);
+ assert(test2.getAckNum() == 9);
+ assert(test2.getWindow() == 12);
+ 
+ assert(test2.getAckFlag());
+ assert(!test2.getSynFlag());
+ assert(test2.getFinFlag());
+ 
+ 
+ cout << "Passed all tests!\n";
+ 
+ 
+ 
+ }
+ 
+ */
 
 
 

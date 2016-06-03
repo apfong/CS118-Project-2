@@ -65,18 +65,23 @@ int main()
 	int CURRENT_ACK_NUM = 0;
 
 	// Variables for timeout using select
-	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 500000; // 500ms
-	int rv;
-	int maxSocketFd = sockfd + 1;
+	struct timeval timeout;
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 500000; // 500ms
+	// List for dealing with timeout for multiple packets
+	PSTList* pstList = new PSTList(sockfd, clientAddr);
 
 	while(true){
 		if (!establishedTCP) {
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 			if(bytesRec == -1){
-				perror("error receiving");
-				return 1;
+				if (EWOULDBLOCK) {
+					cerr << "Doing nothing, in timeout of listening for syn\n";
+				} 
+				else {
+					perror("error receiving");
+					return 1;
+				}
 			}
 		}
 
@@ -101,6 +106,7 @@ int main()
 					return 1;
 				}
 				delete res;
+				cerr << "finished sending TCP setup packet\n";
 				//continue;
 			}
 
@@ -166,31 +172,43 @@ int main()
 
 				vector<char> tcpfile_packet = tcpfile->buildPacket();
 				// Sending response object
+				//pstList->handleNewSend(tcpfile);
 				if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
 							(socklen_t)sizeof(clientAddr)) == -1) {
 					perror("send error");
 					return 1;
 				}
 
-				CURRENT_SEQ_NUM += tcpfile->getData().size();				
-				delete tcpfile;
+				CURRENT_SEQ_NUM += tcpfile->getDataSize();				
+				//delete tcpfile;
 
-				//Listen for ACK
+				// Listen for ACK
+				//timeout = pstList->getTimeout();
+				cerr << "Current timeout timer: " << timeout.tv_usec/1000 << endl;
+				if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
+					cerr << "setsockopt failed when setting it to " << timeout.tv_usec/1000 << "ms\n";
 				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 				if(bytesRec == -1){
-					perror("Error while listening for ACK");
-					return 1;
+					if (EWOULDBLOCK) {
+						// One of sent packets timed out while waiting for an ACK
+						cerr << "A packet timed out while waiting for ack, resending packet\n";
+						pstList->handleTimeout();
+						cerr << "GOT HERE\n";
+					}
+					else {
+						perror("Error while listening for ACK");
+						return 1;
+					}
 				}
 
 				vector<char> recv_data(buf, buf+buf_size);
 				TcpPacket recv_packet(recv_data);
 				cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
+				pstList->handleAck(recv_packet.getAckNum());
 
 				if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
 					CURRENT_ACK_NUM++; //Received ACK
 				}
-
-
 
 			}
 			cerr << "GOT to the end of the file\n\n";
@@ -207,14 +225,36 @@ int main()
 			}
 
 			CURRENT_SEQ_NUM++; //Only increment by 1 bc only sent FIN ACK
-			delete finAck;
+
+			// Setting normal 500ms timer
+			timeout.tv_sec = 0;
+			timeout.tv_usec = 500000;
+			if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
+				cerr << "setsockopt failed when setting it to 500ms\n";
 
 			//Now in FIN_WAIT_1 State, waiting for an ACK
-			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
-			if (bytesRec == -1) {
-				perror("Error while listening for ACK");
-				return 1;
+			bool gotAckForFinAck = false;
+			while (!gotAckForFinAck) {
+				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+				if (bytesRec == -1) {
+					if (EWOULDBLOCK) {
+						cerr << "Timed out when waiting for ACK for fin, resending FIN\n";
+						if (sendto(sockfd, &finAckVector[0], finAckVector.size(), 0, (struct sockaddr *)&clientAddr, (socklen_t)sizeof(clientAddr)) == -1) {
+							perror("send error");
+							return 1;
+						}
+					}
+					else {
+						perror("Error while listening for ACK");
+						return 1;
+					}
+				}
+				else {
+					gotAckForFinAck = true;
+					delete finAck;
+				}
 			}
+
 			vector<char> recv_data(buf, buf+buf_size);
 			TcpPacket recv_packet(recv_data);
 			cout<<"Received ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
@@ -225,8 +265,13 @@ int main()
 			//Now in FIN_WAIT_2 State, waiting for a FIN ACK
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 			if (bytesRec == -1) {
-				perror("Error while listening for FIN ACK");
-				return 1;
+				if (EWOULDBLOCK) {
+					cerr << "Doing nothing, in timeout of waiting for a FIN-ACK\n";
+				}
+				else {
+					perror("Error while listening for FIN ACK");
+					return 1;
+				}
 			}
 			vector<char> recv_data2(buf, buf+buf_size);
 			TcpPacket recv_packet2(recv_data2);
@@ -265,6 +310,7 @@ int main()
 		CURRENT_ACK_NUM = 0;
 
 	}
+	delete pstList;
 	close(sockfd);
 	return 0;
 }

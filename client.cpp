@@ -150,8 +150,6 @@ int main(int argc, char* argv[])
 						delete res;
 						cerr << "Established TCP connection after 3 way handshake\n";
 						establishedTCP = true;
-						if (setsockopt (sockfd, SOL_SOCKET, 0, NULL, NULL) < 0)
-							cerr << "setsockopt failed\n";
 					}
 					delete header;
 				}
@@ -167,7 +165,7 @@ int main(int argc, char* argv[])
 			while((bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize))){
 				if(bytesRec == -1){
 					if (EWOULDBLOCK) {
-						cerr << "";
+						cerr << "Doing nothing, waiting for incoming data packets\n";
 					} else {
 						perror("file receive error");
 						return 1;
@@ -197,8 +195,8 @@ int main(int argc, char* argv[])
 				  }
 				  */
 
-					output << recv_packet.getData();
-					CURRENT_ACK_NUM += recv_packet.getData().size(); //Bytes received
+					output << recv_packet.getDataSize();
+					CURRENT_ACK_NUM += recv_packet.getDataSize(); //Bytes received
 				}
 
 				//Send ACK
@@ -250,7 +248,7 @@ int main(int argc, char* argv[])
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize);
 			if (bytesRec == -1) {
 				if (EWOULDBLOCK) {
-					cerr << "";
+					cerr << "SHOULDNT tIMEOUT HERE, do nothing\n";
 				}
 				else {
 					perror("Error while listening for final ACK");

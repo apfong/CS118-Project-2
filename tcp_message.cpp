@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <set>
 
 using namespace std;
 
@@ -17,18 +18,18 @@ public:
     TcpPacket(uint16_t s, uint16_t a, uint16_t w, uint16_t f, vector<char> d);
     TcpPacket(vector<char> vec);
     
-    uint16_t getSeqNum();
-    uint16_t getAckNum();
+    uint16_t getSeqNum() const;
+    uint16_t getAckNum() const;
     uint16_t getWindow();
     
     bool getAckFlag();
     bool getSynFlag();
     bool getFinFlag();
     
-    uint16_t getDataSize();
+    uint16_t getDataSize() const;
     
     vector<char> buildPacket();
-    string getData();
+    string getData() const;
     
     void testPrint();
     
@@ -62,16 +63,16 @@ TcpPacket::TcpPacket(vector<char> vec) {
     
 }
 
-string TcpPacket::getData(){
+string TcpPacket::getData() const{
     string s(data.begin(), data.end());
     return s;
 }
 
-uint16_t TcpPacket::getSeqNum() {
+uint16_t TcpPacket::getSeqNum() const {
     return seq_num;
 }
 
-uint16_t TcpPacket::getAckNum() {
+uint16_t TcpPacket::getAckNum() const {
     return ack_num;
 }
 
@@ -94,7 +95,7 @@ bool TcpPacket::getFinFlag() {
     return (flags & mask);
 }
 
-uint16_t TcpPacket::getDataSize() {
+uint16_t TcpPacket::getDataSize() const {
     return data.size();
 }
 

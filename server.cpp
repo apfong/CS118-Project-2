@@ -24,15 +24,26 @@ const uint16_t RETRANS_TIMEOUT = 500;
 // basic client's receiver window can always be 30720, but server should be
 // able to properly handle cases when the window is reduced
 
-int main()
+int main(int argc, char* argv[])
 {
+	// Accepting user input for port number and file-name
+	int port = 4000;
+	string resFilename = "index.html";
+	if (argc > 1)
+		port = atoi(argv[1]);
+	if (argc > 2)
+		resFilename = argv[2];
+	if (argc > 3) {
+		cerr << "must have only 3 arguments";
+		return 1;
+	}
 	// create a socket using TCP IP
 	int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(sockfd == -1){
 		perror("bad socket");
 		return 1;
 	}
-	int port = 4000;
+	//int port = 4000;
 	// allow others to reuse the address
 	int yes = 1;
 	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
@@ -49,6 +60,7 @@ int main()
 
 	if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
 		perror("bind");
+
 		return 2;
 	}
 
@@ -145,7 +157,7 @@ int main()
 		}
 
 		cerr << "Got past establishing TCP\n";
-		string resFilename = "index.html";
+		//string resFilename = "index.html";
 
 		// Prepending starting directory to requested filename
 		//resFilename.insert(0, tFiledir);

@@ -32,9 +32,19 @@ bool operator< (const TcpPacket &left, const TcpPacket &right)
 }
 
 
-
 int main(int argc, char* argv[])
 {
+	// Accepting user input for port number and file-name
+	string portstring = "4000";
+	string hoststring = "10.0.0.1";
+	if (argc > 1)
+		portstring = argv[1];
+	if (argc > 2)
+		hoststring = argv[2];
+	if (argc > 3) {
+		cerr << "must have only 3 arguments";
+		return 1;
+	}
 	//char * buf = new char[1024];
 
 	// create a socket using TCP IP
@@ -52,9 +62,9 @@ int main(int argc, char* argv[])
 	hints.ai_socktype = SOCK_DGRAM; // UDP
 	// gets a list of addresses stored in res
 	int status = 0;
-	string hoststring = "10.0.0.1";
+	//string hoststring = "10.0.0.1";
 	const char * host = hoststring.c_str();
-	string portstring = "4000";
+	//string portstring = "4000";
 	const char * port = portstring.c_str();
 	if ((status = getaddrinfo(host, port, &hints, &res)) != 0) {
 		std::cerr << "getaddrinfo: " << gai_strerror(status) << std::endl;

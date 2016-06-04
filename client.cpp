@@ -191,28 +191,29 @@ int main(int argc, char* argv[])
 			break;
 		}
 		vector<char> recv_data(buf, buf+bytesRec);
-		TcpPacket * recv_packet = new TcpPacket(recv_data);
-		cout<<"Received packet w/ SEQ Num: " << recv_packet->getSeqNum() <<", ACK Num: " << recv_packet->getAckNum() << endl;
+		TcpPacket recv_packet(recv_data);// = new TcpPacket(recv_data);
+		cout<<"Received packet w/ SEQ Num: " << recv_packet.getSeqNum() <<", ACK Num: " << recv_packet.getAckNum() << endl;
 
-		cout << "Flags: " << recv_packet->getAckFlag() << " " << recv_packet->getSynFlag() << " " << recv_packet->getFinFlag() << endl;
-		if (recv_packet->getFinFlag()) {
+		cout << "Flags: " << recv_packet.getAckFlag() << " " << recv_packet.getSynFlag() << " " << recv_packet.getFinFlag() << endl;
+		if (recv_packet.getFinFlag()) {
 			cout << "----------------RECEIVED FIN ----------------------\n";
 			// cout << "---NEED TO FIX BUG WHERE WE GET TOO MUCH DATA---\n";
 			// cout << "----SEQ/ACK NUMS WILL BE OFF BECAUSE OF THIS----\n";
-			delete recv_packet;
+			//delete recv_packet;
 			break; //for now just break; i think something's wrong with our last packet's data
 		}
 
-		if (CURRENT_ACK_NUM == recv_packet->getSeqNum()) { //Should this be something else??
+		if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) { //Should this be something else??
 
 			if(rwnd.empty()){
  				  		cout<<"empty buffer"<<endl;
- 					  	output << recv_packet->getData();
- 					  	delete recv_packet;
- 						CURRENT_ACK_NUM = (CURRENT_ACK_NUM + recv_packet->getDataSize()) % MAX_SEQ_NUM; //Bytes received
+ 					  	output << recv_packet.getData();
+ 					  	//delete recv_packet;
+ 						CURRENT_ACK_NUM = (CURRENT_ACK_NUM + recv_packet.getDataSize()) % MAX_SEQ_NUM; //Bytes received
 			}
 			else{
-				rwnd.insert(*recv_packet);
+				cout<<"not empty buffer"<<endl;
+				rwnd.insert(recv_packet);
 				set<TcpPacket>::iterator it = rwnd.begin();
 			  	while(it != rwnd.end() && it->getSeqNum() == CURRENT_ACK_NUM){
 			  		cout<<"writing out packet seq num: "<<it->getSeqNum()<<endl;
@@ -225,12 +226,19 @@ int main(int argc, char* argv[])
 				  	//delete temp;
 				  	rwnd.erase(rem);
 			  	}
+			  	rwnd.clear();
 			}
 		}
 		else{   // received an out of order packet
-			cout<< "received out of order packet, buffering" <<endl;
-			rwnd.insert(*recv_packet);
-			delete recv_packet;
+			
+			if(recv_packet.getSeqNum() > CURRENT_ACK_NUM){
+				cout<< "received out of order packet, buffering" <<endl;
+				rwnd.insert(recv_packet);
+			}
+			else{
+				cout<<"duplicate/older packet dropped"<<endl;
+			}
+			//delete recv_packet;
 		}
 		//Send ACK
 		//doesnt neccessarily need to be an in order packet

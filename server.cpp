@@ -364,6 +364,11 @@ int main()
 			resFile.close();
 			startedHandshake = false;
 		establishedTCP = false;
+		cwnd_pos = 0;
+		cwnd_size = INIT_CWND_SIZE;
+		ss_thresh = INIT_SS_THRESH;
+		slow_start = true;
+		max_size_reached = false;
 		CURRENT_SEQ_NUM = 0;
 		CURRENT_ACK_NUM = 0;
 

@@ -2,11 +2,28 @@
 #include <set>
 
 using namespace std;
+/*
+ #include <cassert>
+ #include <iostream>
+ #include <sys/time.h>
+ #include <netinet/in.h>
+ */
+
+#include <string.h>
+#include <thread>
+#include <iostream>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <fstream>
 
 #include <cassert>
-#include <iostream>
 #include <sys/time.h>
-#include <netinet/in.h>
 
 #include <string.h>
 #include <thread>
@@ -266,6 +283,9 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
     uint16_t ackSeqNum = new_packet->getSeqNum() + new_packet->getDataSize();
     //TODO: CHECK IF IT GOES PAST MAX SEQ NUM??
     
+    if (pairs.empty()) {
+        pairs.push_back(new Pair(new_packet->getSeqNum(), 0));
+    }
     pairs.push_back(new Pair(ackSeqNum, numPackets));
     
     numPackets++;

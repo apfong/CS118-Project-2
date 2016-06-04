@@ -63,7 +63,7 @@ int main()
 	bool startedHandshake = false;
 	uint16_t flags = 0x00;
 	uint16_t cwnd_size = INIT_CWND_SIZE;
-	int cwnd_pos = 0;
+	uint32_t cwnd_pos = 0;
 	uint16_t ss_thresh = INIT_SS_THRESH;
 	int CURRENT_SEQ_NUM = 0;//rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
 	int CURRENT_ACK_NUM = 0;
@@ -159,14 +159,13 @@ int main()
 			ifstream resFile(resFilename, std::ios::binary);
 			vector<char> payload((std::istreambuf_iterator<char>(resFile)),
 					std::istreambuf_iterator<char>());
-			cout<<"size: "<<payload.size()<<endl;
-			//string payloadStr(payload.begin(), payload.end());
-			//int payloadSize = payload.size();
+			size_t payloadSize = payload.size();
+			cout<<"size: "<<payloadSize<<endl;
 
 			vector<char>::iterator packetPoint = payload.begin();
 
 			 //this will break the file up into small packets to be sent over
-			while(packetPoint != payload.end()){
+			while(cwnd_pos != payloadSize + 1){ // packetPoint != payload.end()){
 
 				if(packetPoint - payload.begin() < cwnd_pos + cwnd_size){
 					int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);

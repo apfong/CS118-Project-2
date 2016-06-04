@@ -194,8 +194,9 @@ int main(int argc, char* argv[])
 		TcpPacket * recv_packet = new TcpPacket(recv_data);
 		cout<<"Received packet w/ SEQ Num: " << recv_packet->getSeqNum() <<", ACK Num: " << recv_packet->getAckNum() << endl;
 
+		cout << "Flags: " << recv_packet->getAckFlag() << " " << recv_packet->getSynFlag() << " " << recv_packet->getFinFlag() << endl;
 		if (recv_packet->getFinFlag()) {
-			// cout << "----------------RECEIVED FIN ACK----------------\n";
+			cout << "----------------RECEIVED FIN ----------------------\n";
 			// cout << "---NEED TO FIX BUG WHERE WE GET TOO MUCH DATA---\n";
 			// cout << "----SEQ/ACK NUMS WILL BE OFF BECAUSE OF THIS----\n";
 			delete recv_packet;
@@ -272,25 +273,33 @@ int main(int argc, char* argv[])
 		perror("Error while sending FIN ACK");
 		return 1;
 	}
-	delete finAck;
 
 	//Listen for final ACK
-	bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize);
-	if (bytesRec == -1) {
-		if (EWOULDBLOCK) {
-			cerr << "SHOULDNT tIMEOUT HERE, do nothing\n";
+	bool gotFinalAck = false;
+	while (!gotFinalAck) {
+		bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize);
+		if (bytesRec == -1) {
+			if (EWOULDBLOCK) {
+				cerr << "Timed out while waiting on final ack, resending FIN-ACK\n" << finAck->getFinFlag()<< endl;
+				if (sendto(sockfd, &finAckVector[0], finAckVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
+					perror("Error while sending FIN ACK");
+					return 1;
+				}
+			}
+			else {
+				perror("Error while listening for final ACK");
+				return 1;
+			}
 		}
-		else {
-			perror("Error while listening for final ACK");
-			return 1;
+		vector<char> recv_data(buf, buf+buf_size);
+		TcpPacket recv_packet(recv_data);
+		cout<<"Received final ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
+		if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
+			CURRENT_ACK_NUM++; //RECEIVED ACK
 		}
+		break;
 	}
-	vector<char> recv_data(buf, buf+buf_size);
-	TcpPacket recv_packet(recv_data);
-	cout<<"Received final ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
-	if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
-		CURRENT_ACK_NUM++; //RECEIVED ACK
-	}
+	delete finAck;
 
 	cout<<"Closing connection.\n\n";
 

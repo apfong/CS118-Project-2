@@ -350,6 +350,11 @@ timeval PSTList::getTimeout() {
     if (ms < 0) { //Shouldn't happen, I think?
         cout << "ERROR: Timeout sould never be less than 0?" << endl;
         ms = 0;
+        cout << "   Details:\n";
+        cout << "   Time Sent: " << head->timeSent << endl;
+        cout << "   Packet Num: " << head->packetNum << endl;
+        cout << "   Seq#: " << head->packet->getSeqNum() << endl;
+        cout << "   Ack#: " << head->packet->getAckNum() << endl;
     }
     
     t.tv_sec = 0;

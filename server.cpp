@@ -257,9 +257,9 @@ int main()
 				}
 				
 
-				if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
-					CURRENT_ACK_NUM++; //Received ACK
-				}
+				// if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
+				// 	CURRENT_ACK_NUM++; //Received ACK
+				// }
 			}
 			
 

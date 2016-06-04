@@ -86,7 +86,6 @@ int main()
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 			if(bytesRec == -1){
 				if (EWOULDBLOCK) {
-					cerr << "Doing nothing, in timeout of listening for syn\n";
 					if (!synAckAcked) {
 						flags = 0x06;
 						vector<char> data;
@@ -110,8 +109,6 @@ int main()
 			// Dealing with 3 way handshake headers
 			vector<char> bufVec(buf, buf+MAX_PKT_LEN);
 			TcpPacket* header = new TcpPacket(bufVec);
-			cerr << "EHREE\n";
-			cerr << "Flags [ASF] " << header->getSynFlag() << header->getAckFlag() << header->getFinFlag() << endl;
 
 			// if SYN=1 and ACK=0
 			if (header->getSynFlag() && !(header->getAckFlag())) {

@@ -38,6 +38,7 @@ using namespace std;
 #include <netdb.h>
 #include <fstream>
 
+const uint16_t MAX_SEQ_NUM = 30720;
 
 //==========================================//
 //============TcpPacket=====================//

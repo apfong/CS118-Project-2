@@ -177,6 +177,7 @@ int main(int argc, char* argv[])
 				if(bytesRec == -1){
 					if (EWOULDBLOCK) {
 						cerr << "Doing nothing, waiting for incoming data packets\n";
+						continue;
 					} else {
 						perror("file receive error");
 						return 1;

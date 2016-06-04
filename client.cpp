@@ -206,23 +206,35 @@ int main(int argc, char* argv[])
 				  	  break; //break out of loop
 				  	}
 				  	*/
-				  	output << recv_packet->getData();
-				  	delete recv_packet;
-					CURRENT_ACK_NUM = (CURRENT_ACK_NUM + recv_packet->getDataSize()) % MAX_SEQ_NUM; //Bytes received
+				  	if(rwnd.empty()){
+				  		cout<<"empty buffer"<<endl;
+					  	output << recv_packet->getData();
+					  	delete recv_packet;
+						CURRENT_ACK_NUM = (CURRENT_ACK_NUM + recv_packet->getDataSize()) % MAX_SEQ_NUM; //Bytes received
+					}
+					else{
+						rwnd.insert(*recv_packet);
+						set<TcpPacket>::iterator it = rwnd.begin();
+					  	while(it != rwnd.end() && it->getSeqNum() == CURRENT_ACK_NUM){
+					  		cout<<"writing out packet seq num: "<<it->getSeqNum()<<endl;
+						  	output << it->getData();
+						  	CURRENT_ACK_NUM = (CURRENT_ACK_NUM + it->getDataSize()) % MAX_SEQ_NUM;
+						  	set<TcpPacket>::iterator rem = it;
+						  	it++;
+						  	//may be a memory leak
+						  	//const TcpPacket* temp = &(*rem);
+						  	//delete temp;
+						  	rwnd.erase(rem);
+					  	}
+					}
 				}
 				else{   // received an out of order packet
 					cout<< "received out of order packet, buffering" <<endl;
-					rwnd.insert(*recv_packet);
-					set<TcpPacket>::iterator it = rwnd.begin();
-				  	while(it != rwnd.end() && it->getSeqNum() == CURRENT_ACK_NUM){
-					  	output << it->getData();
-					  	CURRENT_ACK_NUM = (CURRENT_ACK_NUM + it->getDataSize()) % MAX_SEQ_NUM;
-					  	set<TcpPacket>::iterator rem = it;
-					  	it++;
-					  	const TcpPacket* temp = &(*rem);
-					  	delete temp;
-					  	rwnd.erase(rem);
-				  	}
+					//if(rwnd.find(*recv_packet) != rwnd.end()){
+						rwnd.insert(*recv_packet);
+						delete recv_packet;
+
+				  	//}
 				}
 				//Send ACK
 				//doesnt neccessarily need to be an in order packet
@@ -230,7 +242,7 @@ int main(int argc, char* argv[])
 				vector<char> data;
 				uint16_t flags = 0x4; //ACK flag
 
-				CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM; //Increment; only sending an ACK
+				//CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM; //Increment; only sending an ACK
 				TcpPacket* ackPacket = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
 				cout << "Sending ACK w/ SEQ Num: " << CURRENT_SEQ_NUM << ", ACK Num: " << CURRENT_ACK_NUM << endl << endl;
 

@@ -208,6 +208,7 @@ int main()
 						cwnd_size = INIT_CWND_SIZE;
 						slow_start = true;
 						max_size_reached = false;
+						continue;
 					}
 					else {
 						perror("Error while listening for ACK");
@@ -244,9 +245,9 @@ int main()
 				}
 				
 
-				if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
-					CURRENT_ACK_NUM++; //Received ACK
-				}
+				// if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
+				// 	CURRENT_ACK_NUM++; //Received ACK
+				// }
 			}
 			
 

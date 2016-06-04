@@ -211,6 +211,7 @@ int main(int argc, char* argv[])
 					CURRENT_ACK_NUM = (CURRENT_ACK_NUM + recv_packet->getDataSize()) % MAX_SEQ_NUM; //Bytes received
 				}
 				else{   // received an out of order packet
+					cout<< "received out of order packet, buffering" <<endl;
 					rwnd.insert(*recv_packet);
 					set<TcpPacket>::iterator it = rwnd.begin();
 				  	while(it != rwnd.end() && it->getSeqNum() == CURRENT_ACK_NUM){

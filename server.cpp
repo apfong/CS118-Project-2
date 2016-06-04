@@ -76,6 +76,8 @@ int main()
 	timeout.tv_usec = 500000; // 500ms
 	// List for dealing with timeout for multiple packets
 	PSTList* pstList = new PSTList(sockfd, clientAddr);
+	cout<<"server sockfd: "<<sockfd<<endl;
+	cout<<"server clientaddr: "<<clientAddr.sin_port <<endl;
 
 	while(true){
 
@@ -155,30 +157,33 @@ int main()
 			vector<char>::iterator packetPoint = payload.begin();
 
 			 //this will break the file up into small packets to be sent over
-			while(packetPoint != payload.end() && packetPoint - payload.begin() < cwnd_pos + cwnd_size){
+			while(packetPoint != payload.end()){
 
-				int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);
-				vector<char> packet_divide(packetPoint, packetPoint + end);
-				packetPoint += end;
+				if(packetPoint - payload.begin() < cwnd_pos + cwnd_size){
+					int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);
+					vector<char> packet_divide(packetPoint, packetPoint + end);
+					packetPoint += end;
 
-				flags = 0x4; //ACK flag
+					flags = 0x4; //ACK flag
 
-				TcpPacket* tcpfile = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, packet_divide);
-				
-				cout<<"Sending packet w/ SEQ Num: "<< CURRENT_SEQ_NUM <<", ACK Num: " << CURRENT_ACK_NUM <<endl;
+					TcpPacket* tcpfile = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, packet_divide);
+					
+					cout<<"Sending packet w/ SEQ Num: "<< tcpfile->getSeqNum() <<", ACK Num: " << tcpfile->getAckNum() <<endl;
+					cout<<"cwnd size: "<<cwnd_size<<endl;
 
-				vector<char> tcpfile_packet = tcpfile->buildPacket();
-				// Sending response object
-				//pstList->handleNewSend(tcpfile);
-				if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
-							(socklen_t)sizeof(clientAddr)) == -1) {
-					perror("send error");
-					return 1;
+					vector<char> tcpfile_packet = tcpfile->buildPacket();
+					// Sending response object
+					pstList->handleNewSend(tcpfile);
+					if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
+								(socklen_t)sizeof(clientAddr)) == -1) {
+						perror("send error");
+						return 1;
+					}
+					cout<<"packet sent, waiting for receive"<<endl;
+
+					CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + tcpfile->getDataSize()) % MAX_SEQ_NUM;				
+					//delete tcpfile;
 				}
-				cout<<"packet sent, waiting for receive"<<endl;
-
-				CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + tcpfile->getDataSize()) % MAX_SEQ_NUM;				
-				//delete tcpfile;
 
 				// Listen for ACK
 				//timeout = pstList->getTimeout();
@@ -190,7 +195,13 @@ int main()
 					if (EWOULDBLOCK) {
 						// One of sent packets timed out while waiting for an ACK
 						cerr << "A packet timed out while waiting for ack, resending packet\n";
-						pstList->handleTimeout();
+						
+						vector<char> resendPacket = pstList->handleTimeout();
+						if (sendto(sockfd, &resendPacket[0], resendPacket.size(), 0, (struct sockaddr *)&clientAddr,
+								(socklen_t)sizeof(clientAddr)) == -1) {
+							perror("send error");
+							return 1;
+						}
 						cerr << "GOT HERE\n";
 						cwnd_size = cwnd_size - cwnd_size % INIT_CWND_SIZE;
 						ss_thresh = cwnd_size/2;
@@ -207,7 +218,7 @@ int main()
 				vector<char> recv_data(buf, buf+buf_size);
 				TcpPacket recv_packet(recv_data);
 				cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
-				//pstList->handleAck(recv_packet.getAckNum());
+				pstList->handleAck(recv_packet.getAckNum());
 
 				cwnd_pos = recv_packet.getAckNum();
 

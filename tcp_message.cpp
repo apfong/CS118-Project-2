@@ -1,4 +1,3 @@
-#include <string>
 #include <vector>
 #include <set>
 
@@ -8,6 +7,19 @@ using namespace std;
 #include <iostream>
 #include <sys/time.h>
 #include <netinet/in.h>
+
+#include <string.h>
+#include <thread>
+#include <iostream>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <fstream>
 
 
 //==========================================//
@@ -208,11 +220,11 @@ Pair::Pair(uint16_t s, int p) {
 
 class PSTList {
 public:
-    PSTList(int sockfd, sockaddr_in clientAddr);
+    PSTList(int &sockfd, sockaddr_in &clientAddr);
     //TODO: DESTRUCTOR
     
     void handleNewSend(TcpPacket* new_packet);
-    void handleTimeout();
+    vector<char> handleTimeout();
     void handleAck(uint16_t seqNum);
     
     timeval getTimeout();
@@ -227,10 +239,10 @@ private:
     vector<Pair*> pairs;
 };
 
-PSTList::PSTList(int sockfd, sockaddr_in clientAddr) {
+PSTList::PSTList(int &sockfd, sockaddr_in &clientAddr) {
     m_sockfd = sockfd;
-    m_clientAddr = clientAddr;
     
+    m_clientAddr = clientAddr;
     head = nullptr;
     tail = nullptr;
     numPackets = 1;
@@ -259,11 +271,9 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
     numPackets++;
 }
 
-void PSTList::handleTimeout() {
+vector<char> PSTList::handleTimeout() {
+    cout<<"Sending packet w/ SEQ Num: "<< head->packet->getSeqNum() <<", ACK Num: " << head->packet->getAckNum() <<endl;
     vector<char> resendPacket = head->packet->buildPacket();
-    if (sendto(m_sockfd, &resendPacket[0], resendPacket.size(), 0, (struct sockaddr *)&m_clientAddr, (socklen_t)sizeof(m_clientAddr)) == -1) {
-        perror("ERROR: Error while resending packet"); //Error message for now; can't return 1??
-    }
     
     head->timeSent = timestamp();
     
@@ -276,6 +286,7 @@ void PSTList::handleTimeout() {
         tail->next = nullptr;
         
     }
+    return resendPacket;
 }
 
 

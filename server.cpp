@@ -79,30 +79,43 @@ int main()
 	cout<<"server sockfd: "<<sockfd<<endl;
 	cout<<"server clientaddr: "<<clientAddr.sin_port <<endl;
 
-	while(true){
+	bool synAckAcked = false;
 
+	while(true){
 		if (!establishedTCP) {
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 			if(bytesRec == -1){
 				if (EWOULDBLOCK) {
 					cerr << "Doing nothing, in timeout of listening for syn\n";
+					if (!synAckAcked) {
+						flags = 0x06;
+						vector<char> data;
+						TcpPacket* res = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+						vector<char> resPacket = res->buildPacket();
+						if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&clientAddr,
+									(socklen_t)sizeof(clientAddr)) == -1) {
+							perror("send error");
+							return 1;
+						}
+						delete res;
+					}
 				} 
 				else {
 					perror("error receiving");
 					return 1;
 				}
 			}
-		}
 
-		// Finished receiving header
+			// Finished receiving header
 			// Dealing with 3 way handshake headers
-		if (!establishedTCP) {
 			vector<char> bufVec(buf, buf+MAX_PKT_LEN);
 			TcpPacket* header = new TcpPacket(bufVec);
+			cerr << "EHREE\n";
+			cerr << "Flags [ASF] " << header->getSynFlag() << header->getAckFlag() << header->getFinFlag() << endl;
 
 			// if SYN=1 and ACK=0
-			if (header->getSynFlag() && !(header->getAckFlag()) && !startedHandshake) {
-				cerr << "Received TCP setup packet\n";
+			if (header->getSynFlag() && !(header->getAckFlag())) {
+				cerr << "Received SYN packet\n";
 				startedHandshake = true;
 				CURRENT_ACK_NUM = header->getSeqNum() + 1; //I think SEQ, not ACK??
 				flags = 0x06;
@@ -115,18 +128,17 @@ int main()
 					return 1;
 				}
 				delete res;
-				cerr << "finished sending TCP setup packet\n";
-				//continue;
+				cerr << "finished sending SYN-ACK packet\n";
+				continue;
 			}
-
-			if (header->getAckNum() == CURRENT_SEQ_NUM + 1) {
+			else if (!header->getSynFlag() && header->getAckFlag() && startedHandshake) {
 				cerr << "Established TCP connection after 3 way handshake\n";
 				establishedTCP = true;
+				synAckAcked = true;
 				CURRENT_SEQ_NUM++;
 				cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
 				CURRENT_ACK_NUM = header->getSeqNum() + 1;
 				cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
-
 			}
 
 			delete header;
@@ -208,6 +220,7 @@ int main()
 						cwnd_size = INIT_CWND_SIZE;
 						slow_start = true;
 						max_size_reached = false;
+						continue;
 					}
 					else {
 						perror("Error while listening for ACK");

@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
 
 	// Finished setting up TCP connection
 
-	ofstream output("copiedfile.html");
+	ofstream output("copiedfile.jpg");
 	// Get rest of data: UDP packets holding TCP packets
 	while((bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize))){
 		if(bytesRec == -1){

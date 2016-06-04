@@ -143,7 +143,7 @@ int main()
 		}
 
 		cerr << "Got past establishing TCP\n";
-		string resFilename = "index.html";
+		string resFilename = "photo.jpg";
 
 		// Prepending starting directory to requested filename
 		//resFilename.insert(0, tFiledir);

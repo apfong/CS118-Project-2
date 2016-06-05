@@ -99,6 +99,8 @@ int main(int argc, char* argv[])
 
 	int CURRENT_SEQ_NUM = 0;//rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
 	int CURRENT_ACK_NUM = 0;
+
+	int totalrecv = 0;
 	
 	// Variables for timeout using select
 	// ioctlsocket(FIONBIO)/fcntl(O_NONBLOCK), need this for non-blocking sockets?
@@ -221,6 +223,8 @@ int main(int argc, char* argv[])
 			if(rwnd.empty()){
  				  		cout<<"empty buffer"<<endl;
  					  	output << recv_packet.getData();
+ 					  	totalrecv += recv_packet.getData().size();
+ 					  	cout << "total data recv: " << totalrecv<<endl<<endl;
  					  	//delete recv_packet;
  						CURRENT_ACK_NUM = (CURRENT_ACK_NUM + recv_packet.getDataSize()) % MAX_SEQ_NUM; //Bytes received
 			}

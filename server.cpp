@@ -184,6 +184,7 @@ int main(int argc, char* argv[])
 				if(packetPoint - payload.begin() < cwnd_pos + cwnd_size){
 					int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);
 					vector<char> packet_divide(packetPoint, packetPoint + end);
+					cout<<"packet size: "<<end<<endl;
 					packetPoint += end;
 
 					flags = 0x4; //ACK flag
@@ -256,6 +257,7 @@ int main(int argc, char* argv[])
 				}
 				else if(temp_pos < lastAck - MAX_SEQ_NUM/2){
 					cwnd_pos += MAX_SEQ_NUM - (lastAck - temp_pos);
+					lastAck = temp_pos;
 				}
 				cout <<"congestion window pos: " << cwnd_pos<<endl;
 

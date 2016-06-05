@@ -25,19 +25,6 @@ using namespace std;
 #include <cassert>
 #include <sys/time.h>
 
-#include <string.h>
-#include <thread>
-#include <iostream>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <errno.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <fstream>
-
 const uint16_t MAX_SEQ_NUM = 30720;
 
 //==========================================//
@@ -315,6 +302,7 @@ void PSTList::handleAck(uint16_t seqNum) {
     
     vector<Pair*>::iterator it;
     for (it = pairs.begin(); it != pairs.end(); it++) {
+        cout<<"handleack seqnum: "<<(*it)->seqNum<<endl;
         if ((*it)->seqNum == seqNum) {
             lastAck = (*it)->packetAckNum;
             return;

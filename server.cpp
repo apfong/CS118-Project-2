@@ -191,7 +191,6 @@ int main(int argc, char* argv[])
 					
 					//cout<<"Sending packet w/ SEQ Num: "<< tcpfile->getSeqNum() <<", ACK Num: " << tcpfile->getAckNum() <<endl;
 					cout << "Sending data packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << endl;
-					cout<<"cwnd size: "<<cwnd_size<<endl;
 
 					vector<char> tcpfile_packet = tcpfile->buildPacket();
 					// Sending response object
@@ -201,7 +200,7 @@ int main(int argc, char* argv[])
 						perror("send error");
 						return 1;
 					}
-					cout<<"packet sent, waiting for receive"<<endl;
+					//cout<<"packet sent, waiting for receive"<<endl;
 					CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + tcpfile->getDataSize()) % MAX_SEQ_NUM;				
 					//delete tcpfile;
 
@@ -209,14 +208,14 @@ int main(int argc, char* argv[])
 
 				// Listen for ACK
 				timeout = pstList->getTimeout();
-				cerr << "Current timeout timer: " << timeout.tv_usec/1000 << endl;
+				//cerr << "Current timeout timer: " << timeout.tv_usec/1000 << endl;
 				if (timeout.tv_usec/1000 == 0)
 					timeout.tv_usec = 1;
 				if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
 					cerr << "setsockopt failed when setting it to " << timeout.tv_usec/1000 << "ms\n";
-				cerr << "Trying to receive bytes with timeout set at: " << timeout.tv_usec/1000 << endl;
+				//cerr << "Trying to receive bytes with timeout set at: " << timeout.tv_usec/1000 << endl;
 				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
-				cerr << "Finished receiving bytes: " << bytesRec << endl;
+				//cerr << "Finished receiving bytes: " << bytesRec << endl;
 				if(bytesRec == -1){
 					if (EWOULDBLOCK) {
 						// One of sent packets timed out while waiting for an ACK
@@ -246,13 +245,14 @@ int main(int argc, char* argv[])
 				vector<char> recv_data(buf, buf+buf_size);
 				TcpPacket recv_packet(recv_data);
 				//cout<<"Received ACK w/ SEQ Num: "<< recv_packet.getSeqNum() << ", ACK Num: " << recv_packet.getAckNum() << endl << endl;
-				cout << "Receiving ACK packet " << recv_packet.getSeqNum() << endl;
+				cout << "Receiving ACK packet " << recv_packet.getAckNum() << endl;
 				pstList->handleAck(recv_packet.getAckNum());
 
 				cwnd_pos = recv_packet.getAckNum();
 
-				if(slow_start){
-					if(!max_size_reached){
+				if(!max_size_reached){
+					if(slow_start){
+						cout<<"increasing cwnd size"<<endl;
 						cwnd_size += INIT_CWND_SIZE;
 						if(cwnd_size > CWND_MAX_SIZE){
 							cwnd_size = CWND_MAX_SIZE;
@@ -261,10 +261,9 @@ int main(int argc, char* argv[])
 						if(cwnd_size >= ss_thresh)
 							slow_start = false;
 					}
-				}
-				else{
-					if(!max_size_reached){
-						cwnd_size += INIT_CWND_SIZE/(cwnd_size - cwnd_size % INIT_CWND_SIZE);
+					else{
+						cout<<"congestion avoidance" <<endl;
+						cwnd_size += INIT_CWND_SIZE/(cwnd_size / INIT_CWND_SIZE);
 						if(cwnd_size > CWND_MAX_SIZE){
 							cwnd_size = CWND_MAX_SIZE;
 							max_size_reached = true;
@@ -336,7 +335,7 @@ int main(int argc, char* argv[])
 			vector<char> recv_data(buf, buf+buf_size);
 			TcpPacket recv_packet(recv_data);
 			//cout<<"Received ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
-			cout << "Receiving ACK packet " << recv_packet.getSeqNum() << endl;
+			cout << "Receiving ACK packet " << recv_packet.getAckNum() << endl;
 			if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
 				CURRENT_ACK_NUM++; //Received ACK
 			}
@@ -356,7 +355,7 @@ int main(int argc, char* argv[])
 				}
 				vector<char> recv_data2(buf, buf+buf_size);
 				TcpPacket recv_packet2(recv_data2);
-				cout << "Receiving ACK packet " << recv_packet2.getSeqNum() << endl;
+				cout << "Receiving ACK packet " << recv_packet2.getAckNum() << endl;
 				if (recv_packet2.getFinFlag()) {
 					gotFinAck = true;
 				}

@@ -38,6 +38,7 @@ using namespace std;
 #include <netdb.h>
 #include <fstream>
 
+const uint16_t MAX_SEQ_NUM = 30720;
 
 //==========================================//
 //============TcpPacket=====================//
@@ -280,8 +281,7 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
         
     }
     
-    uint16_t ackSeqNum = new_packet->getSeqNum() + new_packet->getDataSize();
-    //TODO: CHECK IF IT GOES PAST MAX SEQ NUM??
+    uint16_t ackSeqNum = (new_packet->getSeqNum() + new_packet->getDataSize()) % MAX_SEQ_NUM;
     
     if (pairs.empty()) {
         pairs.push_back(new Pair(new_packet->getSeqNum(), 0));

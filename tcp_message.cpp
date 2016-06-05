@@ -242,6 +242,8 @@ private:
     int numPackets;
     int lastAck;
     vector<Pair*> pairs;
+    
+    bool firstPair;
 };
 
 PSTList::PSTList(int &sockfd, sockaddr_in &clientAddr) {
@@ -252,6 +254,7 @@ PSTList::PSTList(int &sockfd, sockaddr_in &clientAddr) {
     tail = nullptr;
     numPackets = 1;
     lastAck = 0;
+    firstPair = true;
 }
 
 
@@ -268,10 +271,22 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
         
     }
     
+    //clean up vector of Pairs
+    vector<Pair*>::iterator it = pairs.begin();
+    while (it != pairs.end()) {
+        if ((*it)->packetAckNum < lastAck) {
+            delete (*it);
+            pairs.erase(it);
+        } else {
+            it++;
+        }
+    }
+    
     uint16_t ackSeqNum = (new_packet->getSeqNum() + new_packet->getDataSize()) % MAX_SEQ_NUM;
     
-    if (pairs.empty()) {
+    if (firstPair && pairs.empty()) {
         pairs.push_back(new Pair(new_packet->getSeqNum(), 0));
+        firstPair = false;
     }
     pairs.push_back(new Pair(ackSeqNum, numPackets));
     

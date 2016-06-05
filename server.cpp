@@ -79,6 +79,7 @@ int main(int argc, char* argv[])
 	uint16_t ss_thresh = INIT_SS_THRESH;
 	int CURRENT_SEQ_NUM = 0;//rand() % MAX_SEQ_NUM // from 0->MAX_SEQ_NUM
 	int CURRENT_ACK_NUM = 0;
+	int lastAck = 0;
 	bool slow_start = true;
 	bool max_size_reached = false;
 
@@ -178,7 +179,7 @@ int main(int argc, char* argv[])
 			vector<char>::iterator packetPoint = payload.begin();
 
 			 //this will break the file up into small packets to be sent over
-			while(cwnd_pos != payloadSize + 1){ // packetPoint != payload.end()){
+			while(cwnd_pos < payloadSize + 1){ // packetPoint != payload.end()){
 
 				if(packetPoint - payload.begin() < cwnd_pos + cwnd_size){
 					int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);
@@ -248,7 +249,15 @@ int main(int argc, char* argv[])
 				cout << "Receiving ACK packet " << recv_packet.getAckNum() << endl;
 				pstList->handleAck(recv_packet.getAckNum());
 
-				cwnd_pos = recv_packet.getAckNum();
+				int temp_pos = recv_packet.getAckNum();
+				if(temp_pos > lastAck){
+					cwnd_pos += temp_pos - lastAck;
+					lastAck = temp_pos;
+				}
+				else if(temp_pos < lastAck - MAX_SEQ_NUM/2){
+					cwnd_pos += MAX_SEQ_NUM - (lastAck - temp_pos);
+				}
+				cout <<"congestion window pos: " << cwnd_pos<<endl;
 
 				if(!max_size_reached){
 					if(slow_start){

@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 	const int buf_size = 1024;
 	char * buf = new char[buf_size];
 	memset(buf,'\0',sizeof(buf));
-	cout<<"start recv"<<endl;
+	cerr<<"start recv"<<endl;
 	struct sockaddr_in clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
 	int bytesRec = 0;
@@ -89,8 +89,8 @@ int main(int argc, char* argv[])
 	timeout.tv_usec = 500000; // 500ms
 	// List for dealing with timeout for multiple packets
 	PSTList* pstList = new PSTList(sockfd, clientAddr);
-	cout<<"server sockfd: "<<sockfd<<endl;
-	cout<<"server clientaddr: "<<clientAddr.sin_port <<endl;
+	cerr<<"server sockfd: "<<sockfd<<endl;
+	cerr<<"server clientaddr: "<<clientAddr.sin_port <<endl;
 
 	bool synAckAcked = false;
 
@@ -104,6 +104,7 @@ int main(int argc, char* argv[])
 						vector<char> data;
 						TcpPacket* res = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
 						vector<char> resPacket = res->buildPacket();
+						cout << "Sending data packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << endl;
 						if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&clientAddr,
 									(socklen_t)sizeof(clientAddr)) == -1) {
 							perror("send error");
@@ -148,9 +149,9 @@ int main(int argc, char* argv[])
 				establishedTCP = true;
 				synAckAcked = true;
 				CURRENT_SEQ_NUM++;
-				cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
+				cerr << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
 				CURRENT_ACK_NUM = header->getSeqNum() + 1;
-				cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
+				cerr << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
 			}
 
 			delete header;
@@ -174,7 +175,7 @@ int main(int argc, char* argv[])
 			vector<char> payload((std::istreambuf_iterator<char>(resFile)),
 					std::istreambuf_iterator<char>());
 			size_t payloadSize = payload.size();
-			cout<<"size: "<<payloadSize<<endl;
+			cerr<<"size: "<<payloadSize<<endl;
 
 			vector<char>::iterator packetPoint = payload.begin();
 
@@ -184,7 +185,7 @@ int main(int argc, char* argv[])
 				if(packetPoint - payload.begin() < cwnd_pos + cwnd_size){
 					int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);
 					vector<char> packet_divide(packetPoint, packetPoint + end);
-					cout<<"packet size: "<<end<<endl;
+					cerr<<"packet size: "<<end<<endl;
 					packetPoint += end;
 
 					flags = 0x4; //ACK flag
@@ -259,11 +260,11 @@ int main(int argc, char* argv[])
 					cwnd_pos += MAX_SEQ_NUM - (lastAck - temp_pos);
 					lastAck = temp_pos;
 				}
-				cout <<"congestion window pos: " << cwnd_pos<<endl;
+				cerr <<"congestion window pos: " << cwnd_pos<<endl;
 
 				if(!max_size_reached){
 					if(slow_start){
-						cout<<"increasing cwnd size"<<endl;
+						cerr<<"increasing cwnd size"<<endl;
 						cwnd_size += INIT_CWND_SIZE;
 						if(cwnd_size > CWND_MAX_SIZE){
 							cwnd_size = CWND_MAX_SIZE;
@@ -273,7 +274,7 @@ int main(int argc, char* argv[])
 							slow_start = false;
 					}
 					else{
-						cout<<"congestion avoidance" <<endl;
+						cerr<<"congestion avoidance" <<endl;
 						cwnd_size += INIT_CWND_SIZE/(cwnd_size / INIT_CWND_SIZE);
 						if(cwnd_size > CWND_MAX_SIZE){
 							cwnd_size = CWND_MAX_SIZE;
@@ -388,7 +389,7 @@ int main(int argc, char* argv[])
 			CURRENT_SEQ_NUM++; //Only increment by 1 bc only sent FIN ACK
 			delete finalAck;
 
-			cout<<"Closing connection. TIME_WAIT state has yet to be implemented.\n\n";
+			cerr<<"Closing connection. TIME_WAIT state has yet to be implemented.\n\n";
 
 
 			}

@@ -120,8 +120,9 @@ int main(int argc, char* argv[])
 	vector<char> syn_data;
 	TcpPacket* initTCP = new TcpPacket(CURRENT_SEQ_NUM, 0, 0, flags, syn_data);
 	vector<char> initPacket = initTCP->buildPacket();
-	cout << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
-	cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
+	cerr << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
+	cerr << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
+	cout << "Sending SYN packet " << CURRENT_ACK_NUM << endl; 
 	if (sendto(sockfd, &initPacket[0], initPacket.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
 		perror("send error");
 		return 1;
@@ -134,6 +135,7 @@ int main(int argc, char* argv[])
 			if (EWOULDBLOCK) {
 				if (!gotSynAck) {
 					cerr << "Timed out, resending syn\n";
+					cout << "Sending SYN packet " << CURRENT_ACK_NUM << " Retransmission\n"; 
 					if (sendto(sockfd, &initPacket[0], initPacket.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
 						perror("send error");
 						return 1;
@@ -297,7 +299,7 @@ int main(int argc, char* argv[])
 	CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;//Increment; only sending FIN ACK
 	TcpPacket* finAck = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
 	//cout << "Sending FIN ACK w/ SEQ Num: " << CURRENT_SEQ_NUM << ", ACK Num: " << CURRENT_ACK_NUM << endl;
-	cout << "Sending ACK packet " << CURRENT_ACK_NUM << endl; 
+	cout << "Sending FIN-ACK packet " << CURRENT_ACK_NUM << endl; 
 	vector<char> finAckVector = finAck->buildPacket();
 	//Sending ACK to server
 	if (sendto(sockfd, &finAckVector[0], finAckVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
@@ -312,6 +314,7 @@ int main(int argc, char* argv[])
 		if (bytesRec == -1) {
 			if (EWOULDBLOCK) {
 				cerr << "Timed out while waiting on final ack, resending FIN-ACK\n" << finAck->getFinFlag()<< endl;
+				cout << "Sending FIN-ACK packet " << CURRENT_ACK_NUM << " Retransmission\n";
 				if (sendto(sockfd, &finAckVector[0], finAckVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
 					perror("Error while sending FIN ACK");
 					return 1;

@@ -1,23 +1,91 @@
-
 ------------------------------------------------------------------------------
 |                            High level design                               |
 ------------------------------------------------------------------------------
-Client:
+Client: The client works by first attempting to establish a TCP connection with
+the server through UDP packets. It does so by sending a TCP packet with the SYN
+flag set encapsulated in a UDP datagram. After sending out the SYN, it waits on
+a SYN-ACK from the server. If it receives this before the timeout timer
+expires, it will send back an ACK, at which point the connection is
+established. The server will then begin sending packets with data, as many as
+the size of its congestion window. The client maintains it's own receive
+window, which helps it communicate to the server how much it is capable of
+receiving. A buffer is used to limit the amount of packet retransmission
+required if a packet is lost on the way from the server. It does this by
+holding onto packets received out of order, ultimately writing them out once a
+contiguous chunk of the requested file is received. After the file transfer is
+completed, it begins the TCP connection teardown process. First it sends a TCP
+segment with the FIN flag set and waits for a FIN-ACK from the server. After
+receiving the FIN-ACK, it sends an ACK and then waits for a specified time. If
+the client doesn't hear anything from the server in this time, it assumes that
+the server has closed and so the client also closes its connection to the
+server.
 
-Server:
+The command line specification of the client takes in the server hostname and
+port number.
 
-HTTP Message:
 
-Overall:
+Server: The server is similar to the basic architecture of project 1's
+web-server, however this server doesn't include any sort of parallelism and
+doesn't support concurrent connections. It waits until it receives a TCP
+segment with the SYN flag set. The server will participate in the establishment
+of a TCP connection as described in the beginning of the client description.
+After this connection is established, it immediately begins to send the
+requested file by first fragmenting it into 1024 bit data segments. It then
+sends as many as it can, limited by the size of its congestion window.
+The basic timeout values of both the client and server were set to 500ms. After
+the file transfer finishes, the server mirrors the client, but waits for a FIN
+packet before sending back a FIN-ACK. After an ACK is received for it's
+FIN-ACK, the server closes the connection to the client.
+
+The server takes a port number and filename as command line arguments and
+begins to serve this file once a TCP connection is established with a client.
+
+
+TCP Message: Our tcp_message class allows us to more cleanly create and process
+the datagrams sent between the client and server. It does this by giving us
+access to important elements of the packets, such as the flags set,
+acknowledgement numbers, sequence numbers, window sizes, and of course data.
+
+
+Overall: The main goal of this project was to implement a simple version of TCP
+through UDP. This rudimentary TCP implementation made use of buffering on the
+client side and Tahoe congestion control.
 
 ------------------------------------------------------------------------------
 |                Problems you ran into and how you solved them               |
 ------------------------------------------------------------------------------
-Client:
+Client: On the client side, implementing buffering proved to be an interesting
+problem from the design standpoint. Choosing the right data structure required
+a fair bit of thought as we needed something which could be added to and
+removed from by key, but that would also be sorted according to the time that
+it was added to the strucutre. To deal with this, we eventually decided on
+using a set. The set keeps track of the sequence numbers of received packets,
+holding onto them until the packet with the correct number is received. This
+'correct number' corresponds to the packet with the data which is sequentially
+next with regard to the data which has already been written out. After this
+packet is received, we try to write out as many sequentially packets as we can
+starting from that packet.
 
-Server:
 
-HTTP Message:
+Server: Some of the most memorable challenges we faced with regard to the
+server were implementing the congestion control scheme and timeouts. We wanted
+to deal with timeouts in a way that required the least amount of overhead, in
+this case meaning using just one timer to keep track of timeout values for all
+unacked packets. In tcp_message, you can find that we used a list to implement
+this. The list consists of a vector of Pairs, which map sequence numbers to
+packet acknowledgement numbers and variables to keep track of the number of
+packets that are in the list as well as a variable to keep track of the last
+acknowledged packet. Each node keeps track of the time that the packet it holds
+was sent as well as the packet number of that packet. Using this stored time
+sent, we take the difference between the time sent of the packet and the
+current time to find how much time is left until we need to retransmit a
+packet. This timer keeps track of the packet which will expire the nearest in
+the future. If it expires, we resend the packet then move the packet to the end
+of the list, removing it if it was correctly acked.
+
+
+TCP Message:
+
 
 Overall:
 
@@ -25,17 +93,37 @@ Overall:
 ------------------------------------------------------------------------------
 |                Additional instructions to build your project               |
 ------------------------------------------------------------------------------
-None
+Transferred file is saved to copiedfile.jpg on the client side.
 
 
 ------------------------------------------------------------------------------
 |                       How you tested your code and why                     |
 ------------------------------------------------------------------------------
-Client:
+Client/Server: Most of our testing of the client and server involved testing
+both at the same time. We first attempted to send messages to a server from the
+client using UDP sockets. We did this by implementing a very rudimentary client
+and server, then running each on their respective vagrant instances. After
+making sure that we could communicate between the two, we moved onto
+establishing a TCP connection through a 3 way handshake. We tested this by
+making sure that the server wouldn't begin sending packets with data until
+after this connection was established. We then moved onto sending files that
+required more than one packet to send. After implementing this, we tried
+sending large files and then diffed the output with the original file to make
+sure that no bytes were being lost or corrupted. With this basic functionality,
+we then moved onto being able to handle lost packets and retransmit them when
+lost. To test this, we made use of the Linux traffic control program 'tc'. Some
+of the early setting we used were 'delay 100ms loss 20%'. We found that this
+provided us with a level of loss that was frequent enough to study the behavior
+of our code, but still allow for file transfer at a reasonable speed. 
 
-Server:
+TODO: Congestion control and buffering
 
-HTTP Message:
+
+TCP Message: TCP was first tested by writing simple unit tests to make sure
+that packets were being correctly built and converted into vectors of chars.
+These tests also made sure that each function returned the correct size,
+acknowledgement numbers, sequence numbers, flags, and window size.
+
 
 Overall:
 
@@ -46,9 +134,3 @@ Overall:
 Brandon: Client UID
 Max: HTTPMessage UID
 Alex: Server UID
-
-Questions:
-  What headers do we need to support for responses?
-  What are we supposed to do with the hostname argument for the server?
-  For status header in response, do we need to keep track of code and phrase
-     separately, or is it sufficient to just have a string for both?

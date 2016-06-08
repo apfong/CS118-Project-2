@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 	const int buf_size = 1024;
 	char * buf = new char[buf_size];
 	memset(buf,'\0',sizeof(buf));
-	cerr<<"start recv"<<endl;
+	//cerr<<"start recv"<<endl;
 	struct sockaddr_in clientAddr;
 	socklen_t clientAddrSize = sizeof(clientAddr);
 	int bytesRec = 0;
@@ -89,8 +89,8 @@ int main(int argc, char* argv[])
 	timeout.tv_usec = 500000; // 500ms
 	// List for dealing with timeout for multiple packets
 	PSTList* pstList = new PSTList(sockfd, clientAddr);
-	cerr<<"server sockfd: "<<sockfd<<endl;
-	cerr<<"server clientaddr: "<<clientAddr.sin_port <<endl;
+	//cerr<<"server sockfd: "<<sockfd<<endl;
+	//cerr<<"server clientaddr: "<<clientAddr.sin_port <<endl;
 
 	bool synAckAcked = false;
 
@@ -141,7 +141,7 @@ int main(int argc, char* argv[])
 				}
 				cout << "Sending data packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << endl;
 				delete res;
-				cerr << "finished sending SYN-ACK packet\n";
+				//cerr << "finished sending SYN-ACK packet\n";
 				continue;
 			}
 			else if (!header->getSynFlag() && header->getAckFlag() && startedHandshake) {
@@ -158,24 +158,24 @@ int main(int argc, char* argv[])
 			continue;
 		}
 
-		cerr << "Got past establishing TCP\n";
+		//cerr << "Got past establishing TCP\n";
 
 		// Prepending starting directory to requested filename
 		//resFilename.insert(0, tFiledir);
 
-		cerr << "trying to get file from path: " << resFilename << endl;
+		//cerr << "trying to get file from path: " << resFilename << endl;
 		ifstream resFile (resFilename, ios::in|ios::binary);
 
 		if (resFile.good()) {
-			cerr << "\n//////////////////////////////////////////////////////////////////////////////\n";
-			cerr << "\nOpened file: " << resFilename << endl;
+			//cerr << "\n//////////////////////////////////////////////////////////////////////////////\n";
+			//cerr << "\nOpened file: " << resFilename << endl;
 			resFile.open(resFilename);
 
 			ifstream resFile(resFilename, std::ios::binary);
 			vector<char> payload((std::istreambuf_iterator<char>(resFile)),
 					std::istreambuf_iterator<char>());
 			size_t payloadSize = payload.size();
-			cerr<<"size: "<<payloadSize<<endl;
+			//cerr<<"size: "<<payloadSize<<endl;
 
 			vector<char>::iterator packetPoint = payload.begin();
 
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
 				if(packetPoint - payload.begin() < cwnd_pos + cwnd_size){
 					int end = (payload.end() - packetPoint > INIT_CWND_SIZE) ? INIT_CWND_SIZE : (payload.end() - packetPoint);
 					vector<char> packet_divide(packetPoint, packetPoint + end);
-					cerr<<"packet size: "<<end<<endl;
+					//cerr<<"packet size: "<<end<<endl;
 					packetPoint += end;
 
 					flags = 0x4; //ACK flag
@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
 				if(bytesRec == -1){
 					if (EWOULDBLOCK) {
 						// One of sent packets timed out while waiting for an ACK
-						cerr << "A packet timed out while waiting for ack, resending packet\n";
+						//cerr << "A packet timed out while waiting for ack, resending packet\n";
 						cout << "Sending data packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " Retransmission\n";
 						
 						vector<char> resendPacket = pstList->handleTimeout();
@@ -231,7 +231,6 @@ int main(int argc, char* argv[])
 							perror("send error");
 							return 1;
 						}
-						cerr << "GOT HERE\n";
 						cwnd_size = cwnd_size - cwnd_size % INIT_CWND_SIZE;
 						ss_thresh = cwnd_size/2;
 						cwnd_size = INIT_CWND_SIZE;
@@ -260,11 +259,11 @@ int main(int argc, char* argv[])
 					cwnd_pos += MAX_SEQ_NUM - (lastAck - temp_pos);
 					lastAck = temp_pos;
 				}
-				cerr <<"congestion window pos: " << cwnd_pos<<endl;
+				//cerr <<"congestion window pos: " << cwnd_pos<<endl;
 
 				if(!max_size_reached){
 					if(slow_start){
-						cerr<<"increasing cwnd size"<<endl;
+						//cerr<<"increasing cwnd size"<<endl;
 						cwnd_size += INIT_CWND_SIZE;
 						if(cwnd_size > CWND_MAX_SIZE){
 							cwnd_size = CWND_MAX_SIZE;
@@ -274,7 +273,7 @@ int main(int argc, char* argv[])
 							slow_start = false;
 					}
 					else{
-						cerr<<"congestion avoidance" <<endl;
+						//cerr<<"congestion avoidance" <<endl;
 						cwnd_size += INIT_CWND_SIZE/(cwnd_size / INIT_CWND_SIZE);
 						if(cwnd_size > CWND_MAX_SIZE){
 							cwnd_size = CWND_MAX_SIZE;
@@ -290,7 +289,7 @@ int main(int argc, char* argv[])
 			}
 			
 
-			cerr << "GOT to the end of the file\n\n";
+			//cerr << "GOT to the end of the file\n\n";
 
 			//Sending FIN
 			flags = 0x1;
@@ -333,7 +332,7 @@ int main(int argc, char* argv[])
 					vector<char> recv_data(buf, buf+bytesRec);
 					TcpPacket * recv_packet = new TcpPacket(recv_data);
 					if (recv_packet->getAckFlag()) {//&& recv_packet->getAckNum() == CURRENT_SEQ_NUM){ // TODO: look at what seq# to use here
-						cerr << "Got ack for fin\n";
+						//cerr << "Got ack for fin\n";
 						gotAckForFin = true;
 						delete fin;
 					}
@@ -358,7 +357,7 @@ int main(int argc, char* argv[])
 				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 				if (bytesRec == -1) {
 					if (EWOULDBLOCK) {
-						cerr << "Doing nothing, in timeout of waiting for a FIN-ACK\n";
+						//cerr << "Doing nothing, in timeout of waiting for a FIN-ACK\n";
 					}
 					else {
 						perror("Error while listening for FIN ACK");

@@ -150,9 +150,9 @@ vector<char> TcpPacket::buildPacket() {
 void TcpPacket::testPrint() {
     vector<char>::iterator it;
     for (it = data.begin(); it != data.end(); it++) {
-        cout << "Char: " << *it << endl;
+        cerr << "Char: " << *it << endl;
     }
-    cout << endl;
+    cerr << endl;
 }
 
 // void TcpPacket::startTimer(){
@@ -294,7 +294,7 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
 }
 
 vector<char> PSTList::handleTimeout() {
-    cout<<"Sending packet w/ SEQ Num: "<< head->packet->getSeqNum() <<", ACK Num: " << head->packet->getAckNum() <<endl;
+    //cerr<<"Sending packet w/ SEQ Num: "<< head->packet->getSeqNum() <<", ACK Num: " << head->packet->getAckNum() <<endl;
     vector<char> resendPacket = head->packet->buildPacket();
     
     head->timeSent = timestamp();
@@ -317,14 +317,14 @@ void PSTList::handleAck(uint16_t seqNum) {
     
     vector<Pair*>::iterator it;
     for (it = pairs.begin(); it != pairs.end(); it++) {
-        cout<<"handleack seqnum: "<<(*it)->seqNum<<endl;
+        //cerr<<"handleack seqnum: "<<(*it)->seqNum<<endl;
         if ((*it)->seqNum == seqNum) {
             lastAck = (*it)->packetAckNum;
             return;
         }
     }
     //Should never reach here; error messages for now
-    cout << "ERROR: SHOULD NEVER REACH THIS PART OF THE CODE" << endl;
+    cerr << "ERROR: SHOULD NEVER REACH THIS PART OF THE CODE (Means reached end of file?)" << endl;
 }
 
 
@@ -342,7 +342,7 @@ timeval PSTList::getTimeout() {
     timeval t;
     
     if (head == nullptr) { //Calling timeout on an empty list; shouldn't happen; error message for now
-        cout << "ERROR: This should never happen? Timeout but empty list" << endl;
+        cerr << "ERROR: This should never happen? Timeout but empty list" << endl;
         t.tv_sec = 0;
         t.tv_usec = 0;
         return t;
@@ -351,13 +351,13 @@ timeval PSTList::getTimeout() {
     long ms = head->timeSent + 500 - timestamp(); //How many ms left until timeout
     
     if (ms < 0) { //Shouldn't happen, I think?
-        cout << "ERROR: Timeout sould never be less than 0?" << endl;
+        cerr << "ERROR: Timeout sould never be less than 0?" << endl;
         ms = 0;
-        cout << "   Details:\n";
-        cout << "   Time Sent: " << head->timeSent << endl;
-        cout << "   Packet Num: " << head->packetNum << endl;
-        cout << "   Seq#: " << head->packet->getSeqNum() << endl;
-        cout << "   Ack#: " << head->packet->getAckNum() << endl;
+        cerr << "   Details:\n";
+        cerr << "   Time Sent: " << head->timeSent << endl;
+        cerr << "   Packet Num: " << head->packetNum << endl;
+        cerr << "   Seq#: " << head->packet->getSeqNum() << endl;
+        cerr << "   Ack#: " << head->packet->getAckNum() << endl;
     }
     
     t.tv_sec = 0;
@@ -418,7 +418,7 @@ timeval PSTList::getTimeout() {
  assert(test2.getFinFlag());
  
  
- cout << "Passed all tests!\n";
+ cerr << "Passed all tests!\n";
  
  
  

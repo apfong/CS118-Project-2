@@ -93,6 +93,20 @@ int main(int argc, char* argv[])
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 			if(bytesRec == -1){
 				if (EWOULDBLOCK) {
+					if (startedHandshake && !synAckAcked) {
+ 						flags = 0x06;
+ 						vector<char> data;
+ 						TcpPacket* res = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+ 						vector<char> resPacket = res->buildPacket();
+ 						cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " SYN\n";
+ 
+ 						if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&clientAddr,
+ 									(socklen_t)sizeof(clientAddr)) == -1) {
+ 							perror("send error");
+ 							return 1;
+ 						}
+ 						delete res;
+ 					}
 					continue;
 				} 
 				else {

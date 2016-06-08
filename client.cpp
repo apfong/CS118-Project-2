@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
 			if (header->getSynFlag() && (header->getAckFlag())) {
 				//cerr << "Received TCP setup packet (SYN-ACK packet)\n";
 				gotSynAck = true;
-				delete initTCP;
+				
 				//cerr << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
 				CURRENT_ACK_NUM = header->getSeqNum() + 1;
 				//cout << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
@@ -177,6 +177,7 @@ int main(int argc, char* argv[])
 			delete header;
 		}
 	}
+	delete initTCP;
 	//CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;
 
 	// vector<char> res_data;
@@ -188,7 +189,7 @@ int main(int argc, char* argv[])
 	// 	return 1;
 	// }
 	// delete res;
-	
+
 	// Finished setting up TCP connection
 
 	ofstream output("copiedfile.jpg");

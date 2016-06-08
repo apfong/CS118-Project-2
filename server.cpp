@@ -85,25 +85,15 @@ int main(int argc, char* argv[])
 
 	bool synAckAcked = false;
 
+	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
+		cerr << "setsockopt failed when setting it to " << timeout.tv_usec/1000 << "ms\n";
+
 	while(true){
 		if (!establishedTCP) {
 			bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 			if(bytesRec == -1){
 				if (EWOULDBLOCK) {
-					if (!synAckAcked) {
-						flags = 0x06;
-						vector<char> data;
-						TcpPacket* res = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
-						vector<char> resPacket = res->buildPacket();
-						cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " SYN\n";
-
-						if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&clientAddr,
-									(socklen_t)sizeof(clientAddr)) == -1) {
-							perror("send error");
-							return 1;
-						}
-						delete res;
-					}
+					continue;
 				} 
 				else {
 					perror("error receiving");
@@ -190,6 +180,7 @@ int main(int argc, char* argv[])
 					vector<char> tcpfile_packet = tcpfile->buildPacket();
 					// Sending response object
 					pstList->handleNewSend(tcpfile);
+
 					if (sendto(sockfd, &tcpfile_packet[0], tcpfile_packet.size(), 0, (struct sockaddr *)&clientAddr,
 								(socklen_t)sizeof(clientAddr)) == -1) {
 						perror("send error");
@@ -207,6 +198,7 @@ int main(int argc, char* argv[])
 
 				if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
 					cerr << "setsockopt failed when setting it to " << timeout.tv_usec/1000 << "ms\n";
+
 				//cerr << "Trying to receive bytes with timeout set at: " << timeout.tv_usec/1000 << endl;
 				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 				//cerr << "Finished receiving bytes: " << bytesRec << endl;
@@ -224,8 +216,8 @@ int main(int argc, char* argv[])
 						}
 						cwnd_size = cwnd_size - cwnd_size % INIT_CWND_SIZE;
 						ss_thresh = (MIN_SS_THRESH > cwnd_size/2) ? MIN_SS_THRESH : cwnd_size/2;
-						cwnd_size = INIT_CWND_SIZE;
-						slow_start = true;
+						cwnd_size = ss_thresh;
+						slow_start = false;
 						max_size_reached = false;
 						continue;
 					}
@@ -272,11 +264,7 @@ int main(int argc, char* argv[])
 						}
 					}
 				}
-				
 
-				// if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
-				// 	CURRENT_ACK_NUM++; //Received ACK
-				// }
 			}
 			
 

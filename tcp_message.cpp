@@ -366,14 +366,8 @@ timeval PSTList::getTimeout() {
     
     long ms = head->timeSent + 500 - timestamp(); //How many ms left until timeout
     
-    if (ms < 0) { //Shouldn't happen, I think?
-        // cerr << "ERROR: Timeout sould never be less than 0?" << endl;
-        ms = 0;
-        // cerr << "   Details:\n";
-        // cerr << "   Time Sent: " << head->timeSent << endl;
-        // cerr << "   Packet Num: " << head->packetNum << endl;
-        // cerr << "   Seq#: " << head->packet->getSeqNum() << endl;
-        // cerr << "   Ack#: " << head->packet->getAckNum() << endl;
+    if (ms < 1) { 
+        ms = 1;
     }
     
     t.tv_sec = 0;

@@ -310,7 +310,7 @@ int main(int argc, char* argv[])
 				else {
 					vector<char> recv_data(buf, buf+bytesRec);
 					TcpPacket * recv_packet = new TcpPacket(recv_data);
-					if (recv_packet->getAckFlag()) {//&& recv_packet->getAckNum() == CURRENT_SEQ_NUM){ // TODO: look at what seq# to use here
+					if (recv_packet->getAckFlag() && recv_packet->getSeqNum() == CURRENT_ACK_NUM) {//&& recv_packet->getAckNum() == CURRENT_SEQ_NUM){ // TODO: look at what seq# to use here
 						cerr << "Got ack for fin\n";
 						gotAckForFin = true;
 						delete fin;
@@ -319,16 +319,14 @@ int main(int argc, char* argv[])
 				}
 			}
 			// Increment sequence number only on successful transmission of FIN
-			CURRENT_SEQ_NUM++; //Only increment by 1 bc only sent FIN ACK
+			CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM; //Only increment by 1 bc only sent FIN ACK
 
 
 			vector<char> recv_data(buf, buf+buf_size);
 			TcpPacket recv_packet(recv_data);
 			//cout<<"Received ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
 			cout << "Receiving packet " << recv_packet.getAckNum() << endl;
-			if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
-				CURRENT_ACK_NUM++; //Received ACK
-			}
+            CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM; //Received ACK
 
 			//Now in FIN_WAIT_2 State, waiting for a FIN ACK
 			bool gotFinAck = false;
@@ -347,26 +345,52 @@ int main(int argc, char* argv[])
 				vector<char> recv_data2(buf, buf+buf_size);
 				TcpPacket recv_packet2(recv_data2);
 				cout << "Receiving packet " << recv_packet2.getAckNum() << endl;
-				if (recv_packet2.getFinFlag()) {
+				if (recv_packet2.getFinFlag() && recv_packet2.getSeqNum() == CURRENT_ACK_NUM) {
 					gotFinAck = true;
 				}
 			}
-			CURRENT_ACK_NUM++; //Received FIN ACK
+			CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM; //Received FIN ACK
 
-
-			//Sending final ACK
-			flags = 0x4; //ACK
-			TcpPacket* finalAck = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
-			//cout<<"Sending final ACK w/ SEQ Num: "<<CURRENT_SEQ_NUM<<", ACK Num: "<<CURRENT_ACK_NUM<<endl<<endl;
-			cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << endl;
-			vector<char> finalAckVector = finalAck->buildPacket();
-			if (sendto(sockfd, &finalAckVector[0], finalAckVector.size(), 0, (struct sockaddr *)&clientAddr, (socklen_t)sizeof(clientAddr)) == -1) {
-				perror("send error");
-				return 1;
-			}
-
-			CURRENT_SEQ_NUM++; //Only increment by 1 bc only sent FIN ACK
-			delete finalAck;
+            bool transferDone = false;
+            bool firstSend = true;
+            // Setting normal 1000ms timer
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 1000000;
+            if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
+            cerr << "setsockopt failed when setting it to 1000ms\n";
+            while (!transferDone) {
+                
+                //Sending final ACK
+                flags = 0x4; //ACK
+                TcpPacket* finalAck = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+                //cout<<"Sending final ACK w/ SEQ Num: "<<CURRENT_SEQ_NUM<<", ACK Num: "<<CURRENT_ACK_NUM<<endl<<endl;
+                if (firstSend) {
+                    cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << endl;
+                    firstSend = false;
+                } else {
+                    cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " Retransmission\n";
+                }
+                vector<char> finalAckVector = finalAck->buildPacket();
+                if (sendto(sockfd, &finalAckVector[0], finalAckVector.size(), 0, (struct sockaddr *)&clientAddr, (socklen_t)sizeof(clientAddr)) == -1) {
+                    perror("send error");
+                    return 1;
+                }
+                delete finalAck;
+                
+                bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
+                if (bytesRec == -1) {
+                    if (EWOULDBLOCK) {
+                        transferDone = true;
+                    }
+                    else {
+                        perror("Error while listening for FIN ACK");
+                        return 1;
+                    }
+                }
+                
+            }
+            
+            
 
 			cerr<<"Closing connection. \n\n";
 

@@ -14,7 +14,6 @@
 #include "tcp_message.cpp"
 using namespace std;
 
-
 bool operator< (const TcpPacket &left, const TcpPacket &right)
 {
     return left.getSeqNum() < right.getSeqNum() && left.getSeqNum() > right.getSeqNum() - MAX_SEQ_NUM/2;
@@ -178,7 +177,7 @@ int main(int argc, char* argv[])
 		}
 	}
 	delete initTCP;
-	//CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;
+	CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;
 
 	// vector<char> res_data;
 	// TcpPacket* res_packet = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, res_data);
@@ -221,7 +220,7 @@ int main(int argc, char* argv[])
 			// cout << "---NEED TO FIX BUG WHERE WE GET TOO MUCH DATA---\n";
 			// cout << "----SEQ/ACK NUMS WILL BE OFF BECAUSE OF THIS----\n";
 			//delete recv_packet;
-            CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM;
+      CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM;
 			break; //for now just break; i think something's wrong with our last packet's data
 		}
 
@@ -291,6 +290,7 @@ int main(int argc, char* argv[])
 	TcpPacket* ackPacket = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
 	//cout << "Sending ACK w/ SEQ Num: " << CURRENT_SEQ_NUM << ", ACK Num: " << CURRENT_ACK_NUM << endl << endl;
 	cout << "Sending packet " << CURRENT_ACK_NUM << endl; 
+	cerr << "Sequence recving fin#@: " << CURRENT_SEQ_NUM << endl;
 	vector<char> ackPacketVector = ackPacket->buildPacket();
 	//Send ACK to server
 	if (sendto(sockfd, &ackPacketVector[0], ackPacketVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
@@ -304,6 +304,7 @@ int main(int argc, char* argv[])
 	CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;//Increment; only sending FIN ACK
 	TcpPacket* finAck = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
 	//cout << "Sending FIN ACK w/ SEQ Num: " << CURRENT_SEQ_NUM << ", ACK Num: " << CURRENT_ACK_NUM << endl;
+	cerr << "SEWQ##@: " << CURRENT_SEQ_NUM << endl;
 	cout << "Sending packet " << CURRENT_ACK_NUM << " FIN\n";
 	vector<char> finAckVector = finAck->buildPacket();
 	//Sending ACK to server
@@ -318,12 +319,46 @@ int main(int argc, char* argv[])
 		bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize);
 		if (bytesRec == -1) {
 			if (EWOULDBLOCK) {
-				//cerr << "Timed out while waiting on final ack, resending FIN-ACK\n" << finAck->getFinFlag()<< endl;
+				/*//cerr << "Timed out while waiting on final ack, resending FIN-ACK\n" << finAck->getFinFlag()<< endl;
 				cout << "Sending packet " << CURRENT_ACK_NUM << " Retransmission FIN\n";
 				if (sendto(sockfd, &finAckVector[0], finAckVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
 					perror("Error while sending FIN ACK");
 					return 1;
 				}
+				*/
+            CURRENT_ACK_NUM = CURRENT_ACK_NUM - 1;
+            if (CURRENT_ACK_NUM < 0) {
+                CURRENT_ACK_NUM = MAX_SEQ_NUM;
+            }
+            cout << "Sending packet " << CURRENT_ACK_NUM << " Retransmission \n";
+            flags = 0x4; //ACK flag
+            CURRENT_SEQ_NUM = CURRENT_SEQ_NUM - 1;
+            if (CURRENT_SEQ_NUM < 0) {
+                CURRENT_SEQ_NUM = MAX_SEQ_NUM;
+            }
+            TcpPacket* ackPacketResend = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+            //cout << "Sending ACK w/ SEQ Num: " << CURRENT_SEQ_NUM << ", ACK Num: " << CURRENT_ACK_NUM << endl << endl;
+            vector<char> ackPacketResendVector = ackPacketResend->buildPacket();
+            //Send ACK to server
+            if (sendto(sockfd, &ackPacketResendVector[0], ackPacketResendVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
+                perror("Error while sending ACK");
+                return 1;
+            }
+            delete ackPacketResend;
+            
+            CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM;
+            cout << "Sending packet " << CURRENT_ACK_NUM << " Retransmission FIN\n";
+            flags = 0x5; //FIN ACK
+            CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;//Increment; only sending FIN ACK
+            TcpPacket* finAckResend = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
+            vector<char> finAckResendVector = finAckResend->buildPacket();
+            //Sending ACK to server
+            if (sendto(sockfd, &finAckResendVector[0], finAckResendVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {
+                perror("Error while sending FIN ACK");
+                return 1;
+            }
+            delete finAckResend;
+				continue;
 			}
 			else {
 				perror("Error while listening for final ACK");
@@ -354,7 +389,6 @@ int main(int argc, char* argv[])
             }
             TcpPacket* ackPacketResend = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
             //cout << "Sending ACK w/ SEQ Num: " << CURRENT_SEQ_NUM << ", ACK Num: " << CURRENT_ACK_NUM << endl << endl;
-            cout << "Sending packet " << CURRENT_ACK_NUM << endl;
             vector<char> ackPacketResendVector = ackPacketResend->buildPacket();
             //Send ACK to server
             if (sendto(sockfd, &ackPacketResendVector[0], ackPacketResendVector.size(), 0, (struct sockaddr *)&serverAddr, (socklen_t)sizeof(serverAddr)) == -1) {

@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
 {
 	// Accepting user input for port number and file-name
 	string hoststring = "10.0.0.1";
-	string portstring = "8080";
+	string portstring = "4000";
 	if (argc > 1)
 		hoststring = argv[1];
 	if (argc > 2)

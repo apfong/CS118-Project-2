@@ -14,7 +14,6 @@
 #include "tcp_message.cpp"
 using namespace std;
 
-
 bool operator< (const TcpPacket &left, const TcpPacket &right)
 {
     return left.getSeqNum() < right.getSeqNum() && left.getSeqNum() > right.getSeqNum() - MAX_SEQ_NUM/2;

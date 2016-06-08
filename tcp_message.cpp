@@ -227,6 +227,7 @@ class PSTList {
 public:
     PSTList(int &sockfd, sockaddr_in &clientAddr);
     //TODO: DESTRUCTOR
+    ~PSTList();
     
     void handleNewSend(TcpPacket* new_packet);
     vector<char> handleTimeout();
@@ -364,6 +365,26 @@ timeval PSTList::getTimeout() {
     t.tv_usec = ms*1000;
     
     return t;
+}
+
+PSTList::~PSTList() {
+
+    vector<Pair*>::iterator it = pairs.begin();
+    while (it != pairs.end()) {
+        delete (*it);
+        it++;
+    }
+
+    PSTNode* curr = head;
+    PSTNode* temp;
+    while (curr != nullptr) {
+        temp = curr->next;
+        delete curr->packet;
+        delete curr;
+        curr = temp;
+    }
+
+
 }
 
 

@@ -326,7 +326,7 @@ int main(int argc, char* argv[])
 		}
 		vector<char> recv_data(buf, buf+buf_size);
 		TcpPacket recv_packet(recv_data);
-		//cout<<"Received final ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
+		cerr<<"Received final ACK w/ SEQ Num: "<<recv_packet.getSeqNum()<<", ACK Num: "<<recv_packet.getAckNum()<<endl<<endl;
 		//cerr << "Receiving data packet " << recv_packet.getSeqNum() << endl;
 		if (CURRENT_ACK_NUM == recv_packet.getSeqNum()) {
 			CURRENT_ACK_NUM++; //RECEIVED ACK

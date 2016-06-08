@@ -332,7 +332,7 @@ int main(int argc, char* argv[])
 					vector<char> recv_data(buf, buf+bytesRec);
 					TcpPacket * recv_packet = new TcpPacket(recv_data);
 					if (recv_packet->getAckFlag()) {//&& recv_packet->getAckNum() == CURRENT_SEQ_NUM){ // TODO: look at what seq# to use here
-						//cerr << "Got ack for fin\n";
+						cerr << "Got ack for fin\n";
 						gotAckForFin = true;
 						delete fin;
 					}
@@ -358,6 +358,7 @@ int main(int argc, char* argv[])
 				if (bytesRec == -1) {
 					if (EWOULDBLOCK) {
 						//cerr << "Doing nothing, in timeout of waiting for a FIN-ACK\n";
+						continue;
 					}
 					else {
 						perror("Error while listening for FIN ACK");
@@ -390,10 +391,10 @@ int main(int argc, char* argv[])
 
 			cerr<<"Closing connection. TIME_WAIT state has yet to be implemented.\n\n";
 
-
-			}
 			resFile.close();
-			startedHandshake = false;
+		}
+		
+		startedHandshake = false;
 		establishedTCP = false;
 		cwnd_pos = 0;
 		cwnd_size = INIT_CWND_SIZE;

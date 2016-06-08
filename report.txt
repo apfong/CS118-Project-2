@@ -49,7 +49,14 @@ acknowledgement numbers, sequence numbers, window sizes, and of course data.
 
 Overall: The main goal of this project was to implement a simple version of TCP
 through UDP. This rudimentary TCP implementation made use of buffering on the
-client side and Tahoe congestion control.
+client side and Tahoe congestion control.  The client is run on vagrant client,
+and the server is run on the vagrant server.  They communicate with eachother
+by sending packets to their respective ports.  Since udp is a connectionless
+protocol, this project simulates a connection through the use of timers and
+retransmissions.  A file hosted by the server is transferred to a client
+whenever a client requests a connection to the client.  Even if packets are
+lost in the network, the server will retransmit until the entire file
+is successfully received by the client.
 
 ------------------------------------------------------------------------------
 |                Problems you ran into and how you solved them               |
@@ -81,13 +88,22 @@ sent, we take the difference between the time sent of the packet and the
 current time to find how much time is left until we need to retransmit a
 packet. This timer keeps track of the packet which will expire the nearest in
 the future. If it expires, we resend the packet then move the packet to the end
-of the list, removing it if it was correctly acked.
+of the list, removing it if it was correctly acked. 
 
 
 TCP Message:
-
-
-Overall:
+We faced some problems in the beginning deciding how we should design the
+structure of this class.  We discussed which functions we needed and how
+we should implement so that it was both easy and efficient.  Much of the 
+ack and sequence checking was done here. There was a problem handling acks
+of the server sometimes going into an infinite loop sending and receiving 
+packets.  This was caused by an error in logic in the way we implemented the
+checking for ack and sequence numbers.  At first, we did not test on a file
+that was big enough to cause wrap around in the sequence numbers.  Because
+of this, our implementation relied on the absolute number received, which
+caused problems when the numbers looped back again.  We fixed this by not
+setting the variables to the sequence numbers, but rather adding the
+difference.
 
 
 ------------------------------------------------------------------------------
@@ -116,8 +132,6 @@ of the early setting we used were 'delay 100ms loss 20%'. We found that this
 provided us with a level of loss that was frequent enough to study the behavior
 of our code, but still allow for file transfer at a reasonable speed. 
 
-TODO: Congestion control and buffering
-
 
 TCP Message: TCP was first tested by writing simple unit tests to make sure
 that packets were being correctly built and converted into vectors of chars.
@@ -125,12 +139,10 @@ These tests also made sure that each function returned the correct size,
 acknowledgement numbers, sequence numbers, flags, and window size.
 
 
-Overall:
-
 
 ------------------------------------------------------------------------------
 |                 Contribution of each team member and their UID             |
 ------------------------------------------------------------------------------
 Brandon: Client UID
-Max: HTTPMessage UID
+Max: TCP_Packet UID
 Alex: Server UID

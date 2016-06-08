@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
 			if (header->getSynFlag() && !(header->getAckFlag())) {
 				cerr << "Received SYN packet\n";
 				startedHandshake = true;
-				CURRENT_ACK_NUM = header->getSeqNum() + 1; //I think SEQ, not ACK??
+				CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM; //I think SEQ, not ACK??
 				// Sending SYN-ACK
 				flags = 0x06;
 				vector<char> data;
@@ -132,13 +132,14 @@ int main(int argc, char* argv[])
 				synAckAcked = true;
 				CURRENT_SEQ_NUM++;
 				cerr << "Starting SEQ Num: " << CURRENT_SEQ_NUM << endl;
-				CURRENT_ACK_NUM = header->getSeqNum() + 1;
+				CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM; //I think SEQ, not ACK??
 				cerr << "Starting ACK Num: " << CURRENT_ACK_NUM << endl;
 			}
 
 			delete header;
 			continue;
 		}
+		cerr << "CURACK#####: " << CURRENT_ACK_NUM << endl;
 
 		//cerr << "Got past establishing TCP\n";
 
@@ -296,7 +297,7 @@ int main(int argc, char* argv[])
 					if (EWOULDBLOCK) {
 						//cerr << "Timed out when waiting for ACK for fin, resending FIN\n";
 						//cerr << "Resending FIN w/ SEQ #: " << CURRENT_SEQ_NUM << ", ACK NUM: " << CURRENT_ACK_NUM << endl;
-						cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " Retransmission\n";
+						cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " Retransmission FIN\n";
 						if (sendto(sockfd, &finVector[0], finVector.size(), 0, (struct sockaddr *)&clientAddr, (socklen_t)sizeof(clientAddr)) == -1) {
 							perror("send error");
 							return 1;
@@ -311,6 +312,7 @@ int main(int argc, char* argv[])
 					vector<char> recv_data(buf, buf+bytesRec);
 					TcpPacket * recv_packet = new TcpPacket(recv_data);
 					if (recv_packet->getAckFlag() && recv_packet->getSeqNum() == CURRENT_ACK_NUM) {//&& recv_packet->getAckNum() == CURRENT_SEQ_NUM){ // TODO: look at what seq# to use here
+						cerr << "Seq#: " << recv_packet->getSeqNum() << endl;
 						cerr << "Got ack for fin\n";
 						gotAckForFin = true;
 						delete fin;
@@ -354,8 +356,8 @@ int main(int argc, char* argv[])
             bool transferDone = false;
             bool firstSend = true;
             // Setting normal 1000ms timer
-            timeout.tv_sec = 0;
-            timeout.tv_usec = 1000000;
+            timeout.tv_sec = 1;
+            timeout.tv_usec = 500000;
             if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
             cerr << "setsockopt failed when setting it to 1000ms\n";
             while (!transferDone) {

@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
 			if (header->getSynFlag() && !(header->getAckFlag())) {
 				cerr << "Received SYN packet\n";
 				startedHandshake = true;
-				CURRENT_ACK_NUM = (CURRENT_ACK_NUM + 1) % MAX_SEQ_NUM; //I think SEQ, not ACK??
+				CURRENT_ACK_NUM = (header->getSeqNum() + 1) % MAX_SEQ_NUM;
 				// Sending SYN-ACK
 				flags = 0x06;
 				vector<char> data;
@@ -138,6 +138,7 @@ int main(int argc, char* argv[])
 			delete header;
 			continue;
 		}
+
 		cerr << "CURACK#####: " << CURRENT_ACK_NUM << endl;
 
 		//cerr << "Got past establishing TCP\n";

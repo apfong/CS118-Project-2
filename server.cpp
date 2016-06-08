@@ -13,16 +13,7 @@
 #include "tcp_message.cpp"
 using namespace std;
 
-// Default values for some variables
-// Most are in units of bytes, except retransmission time(ms)
-const uint16_t MAX_PKT_LEN = 1032;
-//const uint16_t MAX_SEQ_NUM = 30720;
-const uint16_t INIT_CWND_SIZE = 1024;
-const uint16_t INIT_SS_THRESH = 30720;
-const uint16_t CWND_MAX_SIZE = INIT_SS_THRESH/2;
-const uint16_t RETRANS_TIMEOUT = 500;
-// basic client's receiver window can always be 30720, but server should be
-// able to properly handle cases when the window is reduced
+
 
 int main(int argc, char* argv[])
 {
@@ -105,6 +96,7 @@ int main(int argc, char* argv[])
 						TcpPacket* res = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, data);
 						vector<char> resPacket = res->buildPacket();
 						cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " SYN\n";
+
 						if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&clientAddr,
 									(socklen_t)sizeof(clientAddr)) == -1) {
 							perror("send error");
@@ -212,8 +204,7 @@ int main(int argc, char* argv[])
 				// Listen for ACK
 				timeout = pstList->getTimeout();
 				//cerr << "Current timeout timer: " << timeout.tv_usec/1000 << endl;
-				if (timeout.tv_usec/1000 == 0)
-					timeout.tv_usec = 1;
+
 				if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(timeout)) < 0)
 					cerr << "setsockopt failed when setting it to " << timeout.tv_usec/1000 << "ms\n";
 				//cerr << "Trying to receive bytes with timeout set at: " << timeout.tv_usec/1000 << endl;
@@ -222,17 +213,17 @@ int main(int argc, char* argv[])
 				if(bytesRec == -1){
 					if (EWOULDBLOCK) {
 						// One of sent packets timed out while waiting for an ACK
-						//cerr << "A packet timed out while waiting for ack, resending packet\n";
-						cout << "Sending packet " << CURRENT_SEQ_NUM << " " << cwnd_size << " " << ss_thresh << " Retransmission\n";
-						
-						vector<char> resendPacket = pstList->handleTimeout();
-						if (sendto(sockfd, &resendPacket[0], resendPacket.size(), 0, (struct sockaddr *)&clientAddr,
+
+						TcpPacket * resendPacket = pstList->handleTimeout();
+						cout << "Sending packet " << resendPacket->getSeqNum() << " " << cwnd_size << " " << ss_thresh << " Retransmission\n";
+						vector<char> packetvector = resendPacket->buildPacket();
+						if (sendto(sockfd, &packetvector[0], packetvector.size(), 0, (struct sockaddr *)&clientAddr,
 								(socklen_t)sizeof(clientAddr)) == -1) {
 							perror("send error");
 							return 1;
 						}
 						cwnd_size = cwnd_size - cwnd_size % INIT_CWND_SIZE;
-						ss_thresh = cwnd_size/2;
+						ss_thresh = (MIN_SS_THRESH > cwnd_size/2) ? MIN_SS_THRESH : cwnd_size/2;
 						cwnd_size = INIT_CWND_SIZE;
 						slow_start = true;
 						max_size_reached = false;
@@ -357,7 +348,7 @@ int main(int argc, char* argv[])
 				bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&clientAddr, &clientAddrSize);
 				if (bytesRec == -1) {
 					if (EWOULDBLOCK) {
-						//cerr << "Doing nothing, in timeout of waiting for a FIN-ACK\n";
+						cerr << "Doing nothing, in timeout of waiting for a FIN-ACK\n";
 						continue;
 					}
 					else {
@@ -389,7 +380,7 @@ int main(int argc, char* argv[])
 			CURRENT_SEQ_NUM++; //Only increment by 1 bc only sent FIN ACK
 			delete finalAck;
 
-			cerr<<"Closing connection. TIME_WAIT state has yet to be implemented.\n\n";
+			cerr<<"Closing connection. \n\n";
 
 			resFile.close();
 		}

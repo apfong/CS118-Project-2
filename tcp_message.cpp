@@ -1,14 +1,3 @@
-#include <vector>
-#include <set>
-
-using namespace std;
-/*
- #include <cassert>
- #include <iostream>
- #include <sys/time.h>
- #include <netinet/in.h>
- */
-
 #include <string.h>
 #include <thread>
 #include <iostream>
@@ -24,8 +13,30 @@ using namespace std;
 
 #include <cassert>
 #include <sys/time.h>
+#include <vector>
+#include <set>
 
+using namespace std;
+/*
+ #include <cassert>
+ #include <iostream>
+ #include <sys/time.h>
+ #include <netinet/in.h>
+ */
+
+
+// Default values for some variables
+// Most are in units of bytes, except retransmission time(ms)
 const uint16_t MAX_SEQ_NUM = 30720;
+const uint16_t MAX_PKT_LEN = 1032;
+//const uint16_t MAX_SEQ_NUM = 30720;
+const uint16_t INIT_CWND_SIZE = 1024;
+const uint16_t INIT_SS_THRESH = 15360;
+const uint16_t MIN_SS_THRESH = INIT_CWND_SIZE;
+const uint16_t CWND_MAX_SIZE = INIT_SS_THRESH;
+const uint16_t RETRANS_TIMEOUT = 500;
+// basic client's receiver window can always be 30720, but server should be
+// able to properly handle cases when the window is reduced
 
 //==========================================//
 //============TcpPacket=====================//
@@ -67,10 +78,10 @@ TcpPacket::TcpPacket(uint16_t s, uint16_t a, uint16_t w, uint16_t f, vector<char
 }
 
 TcpPacket::TcpPacket(vector<char> vec) {
-    seq_num = (vec[0] << 8) | vec[1];
-    ack_num = (vec[2] << 8) | vec[3];
-    window = (vec[4] << 8) | vec[5];
-    flags = (vec[6] << 8) | vec[7];
+    seq_num = ntohs((vec[0] << 8) | vec[1]);
+    ack_num = ntohs((vec[2] << 8) | vec[3]);
+    window = ntohs((vec[4] << 8) | vec[5]);
+    flags = ntohs((vec[6] << 8) | vec[7]);
     
     //read rest of data and store into data.. have to convert from uint16 to char
     vector<char>::iterator it;
@@ -119,23 +130,27 @@ uint16_t TcpPacket::getDataSize() const {
 vector<char> TcpPacket::buildPacket() {
     vector<char> ret;
     
-    char first = seq_num >> 8;
-    char second = seq_num;
+    uint16_t converted_seq_num = htons(seq_num);
+    char first = converted_seq_num >> 8;
+    char second = converted_seq_num;
     ret.push_back(first);
     ret.push_back(second);
     
-    first = ack_num >> 8;
-    second = ack_num;
+    uint16_t converted_ack_num = htons(ack_num);
+    first = converted_ack_num >> 8;
+    second = converted_ack_num;
     ret.push_back(first);
     ret.push_back(second);
     
-    first = window >> 8;
-    second = window;
+    uint16_t converted_window = htons(window);
+    first = converted_window >> 8;
+    second = converted_window;
     ret.push_back(first);
     ret.push_back(second);
     
-    first = flags >> 8;
-    second = flags;
+    uint16_t converted_flags = htons(flags);
+    first = converted_flags >> 8;
+    second = converted_flags;
     ret.push_back(first);
     ret.push_back(second);
     
@@ -230,7 +245,7 @@ public:
     ~PSTList();
     
     void handleNewSend(TcpPacket* new_packet);
-    vector<char> handleTimeout();
+    TcpPacket* handleTimeout();
     void handleAck(uint16_t seqNum);
     
     timeval getTimeout();
@@ -294,9 +309,9 @@ void PSTList::handleNewSend(TcpPacket* new_packet) {
     numPackets++;
 }
 
-vector<char> PSTList::handleTimeout() {
+TcpPacket * PSTList::handleTimeout() {
     //cerr<<"Sending packet w/ SEQ Num: "<< head->packet->getSeqNum() <<", ACK Num: " << head->packet->getAckNum() <<endl;
-    vector<char> resendPacket = head->packet->buildPacket();
+    TcpPacket * resendPacket = head->packet;
     
     head->timeSent = timestamp();
     
@@ -352,13 +367,13 @@ timeval PSTList::getTimeout() {
     long ms = head->timeSent + 500 - timestamp(); //How many ms left until timeout
     
     if (ms < 0) { //Shouldn't happen, I think?
-        cerr << "ERROR: Timeout sould never be less than 0?" << endl;
+        // cerr << "ERROR: Timeout sould never be less than 0?" << endl;
         ms = 0;
-        cerr << "   Details:\n";
-        cerr << "   Time Sent: " << head->timeSent << endl;
-        cerr << "   Packet Num: " << head->packetNum << endl;
-        cerr << "   Seq#: " << head->packet->getSeqNum() << endl;
-        cerr << "   Ack#: " << head->packet->getAckNum() << endl;
+        // cerr << "   Details:\n";
+        // cerr << "   Time Sent: " << head->timeSent << endl;
+        // cerr << "   Packet Num: " << head->packetNum << endl;
+        // cerr << "   Seq#: " << head->packet->getSeqNum() << endl;
+        // cerr << "   Ack#: " << head->packet->getAckNum() << endl;
     }
     
     t.tv_sec = 0;

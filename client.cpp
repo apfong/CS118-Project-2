@@ -14,17 +14,6 @@
 #include "tcp_message.cpp"
 using namespace std;
 
-// Default values for some variables
-// Most are in units of bytes, except retransmission time(ms)
-const uint16_t MAX_PKT_LEN = 1032;
-//const uint16_t MAX_SEQ_NUM = 30720;
-const uint16_t INIT_CWND_SIZE = 1024;
-const uint16_t INIT_SS_THRESH = 30720;
-const uint16_t RETRANS_TIMEOUT = 500;
-const uint16_t RWND_SIZE = 30720;
-// basic client's receiver window can always be 30720, but server should be
-// able to properly  cases when the window is reduced
-
 
 bool operator< (const TcpPacket &left, const TcpPacket &right)
 {
@@ -180,21 +169,36 @@ int main(int argc, char* argv[])
 				// Received something other than a SYN-ACK packet, means connection setup
 				//cerr << "Established TCP connection after 3 way handshake\n";
 				establishedTCP = true;
+
+				delete header;
+				break;
 			}
 
 			delete header;
 		}
 	}
-	CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;
+	//CURRENT_SEQ_NUM = (CURRENT_SEQ_NUM + 1) % MAX_SEQ_NUM;
 
+	// vector<char> res_data;
+	// TcpPacket* res_packet = new TcpPacket(CURRENT_SEQ_NUM, CURRENT_ACK_NUM, INIT_CWND_SIZE, flags, res_data);
+	// vector<char> resPacket = res_packet->buildPacket();
+	// if (sendto(sockfd, &resPacket[0], resPacket.size(), 0, (struct sockaddr *)&serverAddr,
+	// 			(socklen_t)sizeof(serverAddr)) == -1) {
+	// 	perror("send error");
+	// 	return 1;
+	// }
+	// delete res;
+	
 	// Finished setting up TCP connection
 
 	ofstream output("copiedfile.jpg");
+	bool first_packet = true;
 	// Get rest of data: UDP packets holding TCP packets
-	while((bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize))){
+	while(first_packet || (bytesRec = recvfrom(sockfd, buf, buf_size, 0, (struct sockaddr*)&serverAddr, &serverAddrSize))){
+		first_packet = false;
 		if(bytesRec == -1){
 			if (EWOULDBLOCK) {
-				//cerr << "Doing nothing, waiting for incoming data packets\n";
+				cerr << "Doing nothing, waiting for incoming data packets\n";
 				continue;
 			} else {
 				perror("file receive error");
